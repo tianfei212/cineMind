@@ -28,3 +28,37 @@ export interface MindNode {
   isSelected?: boolean;
   level: number;
 }
+
+export interface AppConfig {
+  ui: {
+    header: {
+      title: string;
+      subtitle: string;
+      subtitleEn: string;
+    };
+    footer: {
+      text: string;
+    };
+    logo: {
+      text: string;
+      highlight: string;
+      color: string;
+      iconUrl?: string;
+    };
+    background: {
+      url: string;
+    };
+  };
+  api: {
+    baseUrl: string;
+    timeout: number;
+    endpoints: {
+      generate: string;
+      nodes: string;
+    };
+  };
+  defaultData: {
+    cinematicTree: CinematicNode;
+  };
+}
+

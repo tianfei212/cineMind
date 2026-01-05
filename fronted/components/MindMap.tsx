@@ -20,6 +20,8 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
   
   // Ref to track if we are currently dragging
   const isDraggingRef = React.useRef(false);
+  // Ref for long press timer
+  const longPressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // 初始化显示第一层：环境背景
   useEffect(() => {
@@ -145,6 +147,12 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
   };
 
   const handleDrag = (id: string, info: any) => {
+    // If we start moving, cancel the long press timer
+    if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+    }
+    
     const descendantIds = getDescendantIds(id, nodes);
     setNodes(prev => prev.map(n => {
       if (n.id === id || descendantIds.includes(n.id)) {
@@ -262,7 +270,29 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
               key={node.id}
               drag={!hasFocus || inFocus}
               dragMomentum={false}
-              onDragStart={() => { isDraggingRef.current = true; }}
+              onPointerDown={() => {
+                // Start long press timer
+                longPressTimerRef.current = setTimeout(() => {
+                    toggleSelect(node);
+                    // Clear the timer so drag handler knows it fired
+                    longPressTimerRef.current = null;
+                }, 500);
+              }}
+              onPointerUp={() => {
+                // If timer still exists, clear it (it was a short press/click)
+                if (longPressTimerRef.current) {
+                    clearTimeout(longPressTimerRef.current);
+                    longPressTimerRef.current = null;
+                }
+              }}
+              onDragStart={() => { 
+                isDraggingRef.current = true;
+                // If drag starts, cancel long press
+                if (longPressTimerRef.current) {
+                    clearTimeout(longPressTimerRef.current);
+                    longPressTimerRef.current = null;
+                }
+              }}
               onDragEnd={() => { 
                 // Delay resetting isDraggingRef to allow click handler to see the flag
                 setTimeout(() => { isDraggingRef.current = false; }, 50); 

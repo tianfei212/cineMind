@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AspectRatio, Resolution, GeneratedImage } from './types';
+import { AspectRatio, Resolution, GeneratedImage, AppConfig } from './types';
 import { generateCinematicImage } from './services/geminiService';
+import { loadConfig } from './services/configService';
 import MindMap from './components/MindMap';
 
 const App: React.FC = () => {
+  const [config, setConfig] = useState<AppConfig | null>(null);
   const [images, setImages] = useState<GeneratedImage[]>([]);
   const [ratio, setRatio] = useState<AspectRatio>("16:9");
   const [res, setRes] = useState<Resolution>("1k");
@@ -19,6 +21,14 @@ const App: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
 
   const ITEMS_PER_PAGE = 20;
+
+  useEffect(() => {
+    const initConfig = async () => {
+      const cfg = await loadConfig();
+      setConfig(cfg);
+    };
+    initConfig();
+  }, []);
 
   const handleGenerate = async (selectedLabels: string[]) => {
     if (loading) return;
@@ -85,8 +95,17 @@ const App: React.FC = () => {
   const totalPages = Math.ceil(images.length / ITEMS_PER_PAGE);
   const paginatedImages = images.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
+  if (!config) return null;
+
   return (
-    <div className="flex h-screen w-screen overflow-hidden text-[#1d1d1f] bg-transparent">
+    <div 
+      className="flex h-screen w-screen overflow-hidden text-[#1d1d1f]"
+      style={{ 
+        backgroundImage: config.ui.background.url ? `url(${config.ui.background.url})` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }}
+    >
       
       {/* 左侧控制区 */}
       <aside 
@@ -99,11 +118,11 @@ const App: React.FC = () => {
             animate={{ opacity: 1, x: 0 }}
             className="text-7xl font-extralight tracking-tighter"
           >
-            Cine<span className="font-semibold text-blue-600">Mind</span>
+            {config.ui.logo.text}<span className={`font-semibold ${config.ui.logo.color}`}>{config.ui.logo.highlight}</span>
           </motion.h1>
           <div className="h-px w-20 bg-blue-600/30 mt-6" />
           <p className="text-black/30 mt-6 text-[0.625rem] font-bold uppercase tracking-[0.5em] leading-relaxed">
-            AI 电影构图辅助系统<br/>Professional Cinematography
+            {config.ui.header.subtitle}<br/>{config.ui.header.subtitleEn}
           </p>
         </header>
 
@@ -167,7 +186,7 @@ const App: React.FC = () => {
         </div>
 
         <footer className="mt-auto flex-shrink-0 flex flex-col items-center opacity-10">
-          <span className="text-[0.5625rem] font-black uppercase tracking-[0.8em]">CineMind Lab v3.0</span>
+          <span className="text-[0.5625rem] font-black uppercase tracking-[0.8em]">{config.ui.footer.text}</span>
           <div className="w-2 h-2 rounded-full bg-black mt-4" />
         </footer>
       </aside>
@@ -201,8 +220,8 @@ const App: React.FC = () => {
             <div className="space-y-4">
               <h2 className="text-5xl font-extralight tracking-tighter">作品库</h2>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-[0.125rem] bg-blue-600/20" />
-                <p className="text-black/20 text-[0.625rem] uppercase tracking-[0.3em] font-bold">Chronological Composition Gallery</p>
+                <div className="w-8 h-[2px] bg-blue-600/20" />
+                <p className="text-black/20 text-[10px] uppercase tracking-[0.3em] font-bold">Chronological Composition Gallery</p>
               </div>
             </div>
           </div>
@@ -234,8 +253,8 @@ const App: React.FC = () => {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-700 p-12 flex flex-col justify-end">
                         <div className="flex justify-between items-center border-t border-white/10 pt-8">
-                          <span className="text-[10px] text-white/40 font-black uppercase tracking-widest">{new Date(img.timestamp).toLocaleTimeString()}</span>
-                          <span className="px-5 py-2 bg-white/10 backdrop-blur-md rounded-full text-[10px] text-white font-black">{img.config.ratio}</span>
+                          <span className="text-[0.625rem] text-white/40 font-black uppercase tracking-widest">{new Date(img.timestamp).toLocaleTimeString()}</span>
+                          <span className="px-5 py-2 bg-white/10 backdrop-blur-md rounded-full text-[0.625rem] text-white font-black">{img.config.ratio}</span>
                         </div>
                       </div>
                     </div>

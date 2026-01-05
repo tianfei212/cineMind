@@ -1,0 +1,41 @@
+{
+  "ui": {
+    "header": {
+      "title": "CineMind",
+      "subtitle": "AI 电影构图辅助系统",
+      "subtitleEn": "Professional Cinematography"
+    },
+    "footer": {
+      "text": "CineMind Lab v3.0"
+    },
+    "logo": {
+      "text": "Cine",
+      "highlight": "Mind",
+      "color": "text-blue-600",
+      "iconUrl": "/assets/logo.svg"
+    },
+    "background": {
+      "url": "/assets/background.svg"
+    }
+  },
+  "api": {
+    "baseUrl": "http://localhost:3000",
+    "timeout": 30000,
+    "endpoints": {
+      "generate": "/generate",
+      "nodes": "/nodes"
+    }
+  },
+  "defaultData": {
+    "cinematicTree": {
+      "label": "起点",
+      "children": [
+        { "label": "赛博霓虹都市" },
+        { "label": "古典荒野秘境" },
+        { "label": "废土漫游荒原" },
+        { "label": "极地冰川基地" },
+        { "label": "深海亚特兰蒂斯" }
+      ]
+    }
+  }
+}
