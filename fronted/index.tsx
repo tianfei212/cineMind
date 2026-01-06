@@ -3,9 +3,11 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { initFlexible } from './utils/flexible';
+import { logger } from './utils/logger';
 
 // Initialize flexible scaling
 initFlexible();
+logger.info('前端应用启动');
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

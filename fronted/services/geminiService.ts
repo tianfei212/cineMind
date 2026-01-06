@@ -1,6 +1,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { getConfig } from './configService';
+import { logger } from '../utils/logger';
 
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -17,6 +18,7 @@ export const generateCinematicImage = async (prompt: string, ratio: string): Pro
   
   const ai = getAI();
   try {
+    logger.event('图像生成请求', { prompt, ratio });
     let ar: any = "1:1";
     if (ratio === "16:9") ar = "16:9";
     if (ratio === "4:3") ar = "4:3";
@@ -36,12 +38,14 @@ export const generateCinematicImage = async (prompt: string, ratio: string): Pro
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
+        logger.info('图像生成成功');
         return `data:image/png;base64,${part.inlineData.data}`;
       }
     }
+    logger.warn('图像生成返回空');
     return null;
   } catch (error) {
-    console.error("图像生成失败", error);
+    logger.error("图像生成失败", { error: String(error) });
     // You could fallback to a backend API call here using config.api.baseUrl
     return null;
   }

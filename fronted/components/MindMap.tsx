@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MindNode, CinematicNode } from '../types';
 import { getConfig, loadConfig } from '../services/configService';
+import { logger } from '../utils/logger';
 
 interface MindMapProps {
   onSelectionComplete: (selectedLabels: string[]) => void;
@@ -126,9 +127,11 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
 
     if (focusedNodeId === node.id) {
       setFocusedNodeId(null);
+      logger.event('取消聚焦节点', { id: node.id, label: node.label });
       return;
     }
     setFocusedNodeId(node.id);
+    logger.event('聚焦节点', { id: node.id, label: node.label });
 
     const hasChildren = nodes.some(n => n.parentId === node.id);
     if (hasChildren) return;
@@ -173,7 +176,11 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
   const toggleSelect = (node: MindNode) => {
     setNodes(prev => prev.map(n => {
       if (n.level === node.level) {
-        if (n.id === node.id) return { ...n, isSelected: !n.isSelected };
+        if (n.id === node.id) {
+          const nextSelected = !n.isSelected;
+          logger.event(nextSelected ? '选择节点' : '取消选择节点', { id: n.id, label: n.label, level: n.level });
+          return { ...n, isSelected: nextSelected };
+        }
         return { ...n, isSelected: false }; 
       }
       return n;
@@ -262,7 +269,10 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
 
         <div className="p-6 border-t border-white/5">
           <button 
-            onClick={() => onSelectionComplete(selectedLabels)}
+            onClick={() => {
+              logger.event('提交选择', { selectedLabels });
+              onSelectionComplete(selectedLabels);
+            }}
             disabled={selectedLabels.length === 0}
             className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold tracking-widest transition-all shadow-xl shadow-blue-600/20 disabled:opacity-30 disabled:grayscale"
           >

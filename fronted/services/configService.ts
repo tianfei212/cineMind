@@ -1,4 +1,5 @@
 import { AppConfig } from '../types';
+import { logger } from '../utils/logger';
 
 export let appConfig: AppConfig | null = null;
 
@@ -29,9 +30,10 @@ export const loadConfig = async (): Promise<AppConfig> => {
     if (!validateNode(appConfig.defaultData.cinematicTree)) {
       throw new Error('Invalid cinematicTree schema');
     }
+    logger.info('配置加载成功');
     return appConfig!;
   } catch (error) {
-    console.error('Error loading config:', error);
+    logger.error('配置加载失败', { error: String(error) });
     // Fallback default config if loading fails
     return {
       ui: {
