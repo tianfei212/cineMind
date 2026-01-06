@@ -1,0 +1,77 @@
+{
+  "operation_mode": "config_file",
+  "api_keys": {
+    "dashscope": "",
+    "z_image": "",
+    "wan": ""
+  },
+  "models": {
+    "qwen": "qwen-max",
+    "wan": "wan2.6-t2i",
+    "z_image": "z-image-turbo"
+  },
+  "endpoints": {
+    "qwen": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+    "z_image": "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+    "wan": "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+    "wan_image": "https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis"
+  },
+  "storage": {
+    "output_dir": "outputs"
+  },
+  "prompts": {
+    "role": "You are an expert AI image generation prompt engineer. Your goal is to rewrite the user's input into a highly detailed, descriptive, and artistic prompt suitable for high-end image generation models. You should also provide a comprehensive negative prompt to avoid common artifacts.",
+    "default_negative_prompt": "文字，水印，签名，模糊，重影，低对比度，畸形肢体，图标",
+    "flows": [
+      {
+        "id": "keywords_from_labels",
+        "name": "按标签生成关键词",
+        "system": "你是资深影像提示词工程师。针对中文标签生成高质量中文关键词。",
+        "user_template": "基于以下节点路径生成Top{top}中文关键词，以逗号分隔，仅输出关键词：\\n{labels_joined}"
+      },
+      {
+        "id": "prompts_from_labels",
+        "name": "按标签生成中英提示词",
+        "system": "你是资深影像提示词工程师。输出中文与英文的成品提示词，适合高端图像生成。",
+        "user_template": "根据以下路径生成中文与英文成品提示词，包含主体、环境、光线、镜头语言、风格与细节层级。\\n路径：{labels_joined}\\n负面：{negative_prompt}"
+      },
+      {
+        "id": "ai_suggest",
+        "name": "统一建议：提示词与关键词",
+        "system": "你是资深影像提示词工程师。先生成中文与英文成品提示词，再给出Top{top}中文关键词。",
+        "user_template": "选中标签路径：{labels_joined}\\n请输出：\\n1) 中文成品提示词\\n2) English finished prompt\\n3) Top{top}中文关键词（逗号分隔）\\n负面：{negative_prompt}"
+      },
+      {
+        "id": "step_suggest",
+        "name": "逐层递进建议",
+        "system": "角色：你是资深影像提示词工程师兼图片创意专家。岗位职责：根据输入的关键提示词生成优化后的新的关键提示词。工作内容：1) 接收动态参数[影片类型:{界面传入的影片类型名称}]作为核心输入条件；2) 针对每次叠加选择的影片类型组合生成精准匹配的提示词；3) 严格输出10个独立的关键提示词；4) 每个关键词必须具备高检索价值、反映影片类型特征、且无重复；5) 输出格式：纯文本连续排列，每行一个关键词，禁止编号/标点/解释；6) 需适配多轮叠加的影片类型组合场景；7) 确保生成的关键词符合专业影像创作标准。",
+        "user_template": "请基于影片类型组合「{film_combo}」为目标类别「{target}」生成Top{top}条中文关键提示词。严格格式：仅输出纯中文关键词列表，每行恰好一个关键词；禁止任何编号、标点、符号或解释；总行数必须为{top}；每个关键词独立且具备检索价值。"
+      }
+    ]
+  },
+  "parameters": {
+    "temperature_range": [0.5, 1.3],
+    "top_p_range": [0.2, 0.9],
+    "prompt_delta_ratio": 0.1,
+    "enable_prompt_update_request": true
+  },
+  "enable_prompt_update_request": false,
+  "Is_full_by_AI": true
+  ,
+  "cinematicTree": {
+    "label": "起点",
+    "desc": "电影构图发散树的根节点",
+    "children": [
+      { "label": "科幻", "desc": "影片类型：未来科技、宇宙探索、人工智能等主题" },
+      { "label": "二次元动漫", "desc": "影片类型：动画美学、夸张表现、幻想叙事" },
+      { "label": "纪实电影", "desc": "影片类型：真实事件、观察视角、社会议题" },
+      { "label": "浪漫电影", "desc": "影片类型：爱情叙事、诗意表达、情感抒发" },
+      { "label": "惊恐电影", "desc": "影片类型：恐惧心理、未知威胁、压迫氛围" },
+      { "label": "动作电影", "desc": "影片类型：速度与力量、强对抗、高张力" },
+      { "label": "悬疑电影", "desc": "影片类型：谜题结构、反转叙事、心理张力" },
+      { "label": "历史史诗", "desc": "影片类型：宏大叙事、时代冲突、文明史诗" },
+      { "label": "奇幻电影", "desc": "影片类型：魔法设定、非现实世界、象征寓言" },
+      { "label": "黑色幽默", "desc": "影片类型：荒诞讽刺、反讽喜剧、黑色风格" }
+    ]
+  }
+}

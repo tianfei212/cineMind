@@ -24,17 +24,17 @@
     "aspectRatios": ["16:9", "4:3", "2.35:1", "1:1"],
     "resolutions": ["480p", "720p", "1k", "2k"]
     ,
-    "levelLabels": ["影片类型", "环境背景", "角色个体", "精彩瞬间", "关键元素", "镜头语言", "年代"]
+    "levelLabels": ["影片类型", "环境背景","主角类型", "角色个体", "精彩瞬间", "关键元素", "镜头语言", "年代"]
   },
   "api": {
-    "baseUrl": "http://localhost:3000",
+    "baseUrl": "http://localhost:3002",
     "frontendPort": 3001,
     "backendHost": "localhost",
-    "backendPort": 3000,
+    "backendPort": 3002,
     "timeout": 30000,
     "endpoints": {
       "generate": "/generate",
-      "nodes": "/nodes"
+      "nodes": "/pages/tree"
     }
   },
   "defaultData": {
@@ -226,6 +226,6 @@
         }
       ]
     },
-    "is_from_db_load": false
+    "is_from_db_load": true
   }
 }

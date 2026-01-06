@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MindNode, CinematicNode } from '../types';
 import { getConfig, loadConfig } from '../services/configService';
 import { logger } from '../utils/logger';
+import { request } from '../services/httpClient';
+import { createMindNode, getAiContent, getKeywords, getCinematicTree, aiSuggest, stepSuggest } from '../services/api';
 
 interface MindMapProps {
   onSelectionComplete: (selectedLabels: string[]) => void;
@@ -24,6 +26,8 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
   // Ref for long press timer
   const longPressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const [levelLabels, setLevelLabels] = useState<string[]>([]);
+  const [aiPrompts, setAiPrompts] = useState<Record<string, { zh: string; en: string }>>({});
+  const [aiKeywords, setAiKeywords] = useState<Record<string, string[]>>({});
 
   // 载入数据树：优先后端，否则配置
   useEffect(() => {
@@ -37,11 +41,13 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
         }
         setLevelLabels(cfg.ui.levelLabels ?? ["影片类型", "环境背景", "角色个体", "精彩瞬间", "关键元素", "镜头语言", "年代"]);
         if (cfg.defaultData.is_from_db_load) {
-          const resp = await fetch(`${cfg.api.baseUrl}${cfg.api.endpoints.nodes}`);
-          if (resp.ok) {
-            const tree = await resp.json();
-            setDataTree(tree);
+          try {
+            const tree = await request<any>(cfg.api.endpoints.nodes, { method: 'GET' });
+            setDataTree(tree as any);
+            logger.info('从后端加载首屏树成功');
             return;
+          } catch (e) {
+            logger.error('从后端加载首屏树失败', e as any);
           }
         }
         setDataTree(cfg.defaultData.cinematicTree);
@@ -121,7 +127,55 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
     return null;
   };
 
-  const handleNodeLeftClick = (node: MindNode) => {
+  const buildPath = (n: MindNode, acc: string[] = []): string[] => {
+    const newAcc = [n.label, ...acc];
+    if (!n.parentId) return newAcc;
+    const parent = nodes.find(p => p.id === n.parentId);
+    return parent ? buildPath(parent, newAcc) : newAcc;
+  };
+
+  const spawnChildrenFromLabels = (parent: MindNode, labels: string[]) => {
+    if (parent.level + 1 >= levelLabels.length) return;
+    const existing = nodes.filter(n => n.parentId === parent.id).map(n => n.label);
+    const newLabels = labels.filter(l => !existing.includes(l));
+    if (newLabels.length === 0) return;
+    const nextLevel = parent.level + 1;
+    const count = newLabels.length;
+    const baseAngle = Math.atan2(parent.y - window.innerHeight / 2, parent.x - window.innerWidth / 2);
+    const spread = Math.PI * 1.4;
+    const startAngle = baseAngle - spread / 2;
+    const radius = 240 * scale;
+    const added: MindNode[] = newLabels.map((label, i) => {
+      const angle = startAngle + (i / (count - 1 || 1)) * spread;
+      return {
+        id: `node-${nextLevel}-${Math.random().toString(36).substr(2, 5)}`,
+        label,
+        parentId: parent.id,
+        x: parent.x + Math.cos(angle) * radius,
+        y: parent.y + Math.sin(angle) * radius,
+        isSelected: false,
+        level: nextLevel,
+      };
+    });
+    setNodes(prev => [...prev, ...added]);
+    setConnections(prev => [...prev, ...added.map(s => ({ from: parent.id, to: s.id }))]);
+  };
+
+  const buildQueryContext = (node: MindNode): { type: string; label: string }[] => {
+    const pathLabels = buildPath(node);
+    const selectedByLevel: Record<number, string> = {};
+    nodes.forEach(n => { if (n.isSelected) selectedByLevel[n.level] = n.label; });
+    const maxLevel = node.level;
+    const typed: { type: string; label: string }[] = [];
+    for (let i = 0; i <= maxLevel; i++) {
+      const type = levelLabels[i % levelLabels.length];
+      const label = (selectedByLevel[i] !== undefined) ? selectedByLevel[i] : (pathLabels[i] || "");
+      if (label) typed.push({ type, label });
+    }
+    return typed;
+  };
+
+  const handleNodeLeftClick = async (node: MindNode) => {
     // If we just finished dragging, ignore the click
     if (isDraggingRef.current) return;
 
@@ -132,48 +186,83 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
     }
     setFocusedNodeId(node.id);
     logger.event('聚焦节点', { id: node.id, label: node.label });
+    setNodes(prev => prev.map(n => {
+      if (n.level === node.level) {
+        return { ...n, isSelected: n.id === node.id };
+      }
+      return n;
+    }));
 
     const hasChildren = nodes.some(n => n.parentId === node.id);
-    if (hasChildren) return;
+    if (hasChildren) {
+      const ctx = buildQueryContext(node);
+      const nextIdx = node.level + 1;
+      if (nextIdx >= levelLabels.length) {
+        logger.info('已到最后一层，停止递进查询');
+        return;
+      }
+      const nextType = levelLabels[nextIdx];
+      try {
+        const res = await stepSuggest(ctx, nextType, 10);
+        setAiKeywords(prev => ({ ...prev, [node.id]: res.items }));
+        spawnChildrenFromLabels(node, res.items);
+        logger.event('逐层建议', { context: ctx, target: res.target_type, items: res.items });
+      } catch (e) {
+        logger.error('逐层建议失败', e as any);
+      }
+      return;
+    }
 
-    const getPath = (n: MindNode, acc: string[] = []): string[] => {
-      const newAcc = [n.label, ...acc];
-      if (!n.parentId) return newAcc;
-      const parent = nodes.find(p => p.id === n.parentId);
-      return parent ? getPath(parent, newAcc) : newAcc;
-    };
-
-    const path = getPath(node);
+    const path = buildPath(node);
     const dataNode = dataTree ? findDataNode(path, dataTree) : null;
 
     if (dataNode && dataNode.children) {
       const nextLevel = node.level + 1;
-      const count = dataNode.children.length;
-      const subNodes: MindNode[] = dataNode.children.map((child, i) => {
-        // 使用更动态的排布：在父节点周围做圆周排布，偏移角度避开父节点来源方向
-        const baseAngle = Math.atan2(node.y - window.innerHeight / 2, node.x - window.innerWidth / 2);
-        const spread = Math.PI * 1.2; // 展开角度
-        const startAngle = baseAngle - spread / 2;
-        const angle = startAngle + (i / (count - 1 || 1)) * spread;
-        const radius = 260 * scale;
-        
-        return {
-          id: `node-${nextLevel}-${Math.random().toString(36).substr(2, 5)}`,
-          label: child.label,
-          parentId: node.id,
-          x: node.x + Math.cos(angle) * radius,
-          y: node.y + Math.sin(angle) * radius,
-          isSelected: false,
-          level: nextLevel
-        };
-      });
+      if (nextLevel >= levelLabels.length) {
+        logger.info('已到最后一层，停止展开静态子节点');
+      } else {
+        const count = dataNode.children.length;
+        const subNodes: MindNode[] = dataNode.children.map((child, i) => {
+          // 使用更动态的排布：在父节点周围做圆周排布，偏移角度避开父节点来源方向
+          const baseAngle = Math.atan2(node.y - window.innerHeight / 2, node.x - window.innerWidth / 2);
+          const spread = Math.PI * 1.2; // 展开角度
+          const startAngle = baseAngle - spread / 2;
+          const angle = startAngle + (i / (count - 1 || 1)) * spread;
+          const radius = 260 * scale;
+          
+          return {
+            id: `node-${nextLevel}-${Math.random().toString(36).substr(2, 5)}`,
+            label: child.label,
+            parentId: node.id,
+            x: node.x + Math.cos(angle) * radius,
+            y: node.y + Math.sin(angle) * radius,
+            isSelected: false,
+            level: nextLevel
+          };
+        });
 
-      setNodes(prev => [...prev, ...subNodes]);
-      setConnections(prev => [...prev, ...subNodes.map(s => ({ from: node.id, to: s.id }))]);
+        setNodes(prev => [...prev, ...subNodes]);
+        setConnections(prev => [...prev, ...subNodes.map(s => ({ from: node.id, to: s.id }))]);
+      }
+    }
+    const ctx = buildQueryContext(node);
+    const nextIdx = node.level + 1;
+    if (nextIdx >= levelLabels.length) {
+      logger.info('已到最后一层，停止递进查询');
+      return;
+    }
+    const nextType = levelLabels[nextIdx];
+    try {
+      const res = await stepSuggest(ctx, nextType, 10);
+      setAiKeywords(prev => ({ ...prev, [node.id]: res.items }));
+      spawnChildrenFromLabels(node, res.items);
+      logger.event('逐层建议', { context: ctx, target: res.target_type, items: res.items });
+    } catch (e) {
+      logger.error('逐层建议失败', e as any);
     }
   };
 
-  const toggleSelect = (node: MindNode) => {
+  const toggleSelect = async (node: MindNode) => {
     setNodes(prev => prev.map(n => {
       if (n.level === node.level) {
         if (n.id === node.id) {
@@ -185,6 +274,21 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
       }
       return n;
     }));
+    const ctx = buildQueryContext(node);
+    const nextIdx = node.level + 1;
+    if (nextIdx >= levelLabels.length) {
+      logger.info('已到最后一层，停止递进查询(选择)');
+      return;
+    }
+    const nextType = levelLabels[nextIdx];
+    try {
+      const res = await stepSuggest(ctx, nextType, 10);
+      setAiKeywords(prev => ({ ...prev, [node.id]: res.items }));
+      spawnChildrenFromLabels(node, res.items);
+      logger.event('逐层建议(选择)', { context: ctx, target: res.target_type, items: res.items });
+    } catch (e) {
+      logger.error('逐层建议失败(选择)', e as any);
+    }
   };
 
   const handleDrag = (id: string, info: any) => {
@@ -261,6 +365,17 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
                       <div className="w-1.5 h-1.5 rounded-full bg-white/10" />
                     </div>
                   )}
+                  {selectedAtThisLevel && aiPrompts[selectedAtThisLevel.id] && (
+                    <div className="mt-2 text-xs text-white/70">
+                      <div className="font-bold">AI提示词（中）</div>
+                      <div className="text-white/80">{aiPrompts[selectedAtThisLevel.id].zh}</div>
+                      <div className="font-bold mt-1">AI提示词（英）</div>
+                      <div className="text-white/80">{aiPrompts[selectedAtThisLevel.id].en}</div>
+                      {aiKeywords[selectedAtThisLevel.id] && (
+                        <div className="mt-1">关键词：{aiKeywords[selectedAtThisLevel.id].join('，')}</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -269,8 +384,15 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
 
         <div className="p-6 border-t border-white/5">
           <button 
-            onClick={() => {
+            onClick={async () => {
               logger.event('提交选择', { selectedLabels });
+              try {
+                const tree = await getCinematicTree();
+                setDataTree(tree as any);
+                logger.info('灵感触发：从后端获取 cinematicTree 成功');
+              } catch (e) {
+                logger.error('灵感触发：获取 cinematicTree 失败', e as any);
+              }
               onSelectionComplete(selectedLabels);
             }}
             disabled={selectedLabels.length === 0}
