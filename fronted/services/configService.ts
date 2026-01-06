@@ -64,7 +64,7 @@ export const loadConfig = async (): Promise<AppConfig> => {
         baseUrl: "http://localhost:3000",
         timeout: 30000,
         endpoints: {
-          generate: "/generate",
+          generate: "/tasks/generate",
           nodes: "/nodes"
         },
         frontendPort: 3001,

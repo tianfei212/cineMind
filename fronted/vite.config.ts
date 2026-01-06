@@ -9,6 +9,39 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        proxy: {
+          '/pages': {
+            target: 'http://127.0.0.1:3002',
+            changeOrigin: true,
+            secure: false,
+          },
+          '/nodes': {
+            target: 'http://127.0.0.1:3002',
+            changeOrigin: true,
+            secure: false,
+          },
+          '/tasks': {
+            target: 'http://127.0.0.1:3002',
+            changeOrigin: true,
+            secure: false,
+          },
+          '/media': {
+            target: 'http://127.0.0.1:3002',
+            changeOrigin: true,
+            secure: false,
+          },
+          '/health': {
+            target: 'http://127.0.0.1:3002',
+            changeOrigin: true,
+            secure: false,
+          },
+          '/ws': {
+            target: 'ws://127.0.0.1:3002',
+            ws: true,
+            changeOrigin: true,
+            secure: false,
+          }
+        },
       },
       plugins: [
         react(),

@@ -5,7 +5,7 @@ import { MindNode, CinematicNode } from '../types';
 import { getConfig, loadConfig } from '../services/configService';
 import { logger } from '../utils/logger';
 import { request } from '../services/httpClient';
-import { createMindNode, getAiContent, getKeywords, getCinematicTree, aiSuggest, stepSuggest } from '../services/api';
+import { createMindNode, getAiContent, getKeywords, getCinematicTree, aiSuggest, stepSuggest, generateImageTask } from '../services/api';
 
 interface MindMapProps {
   onSelectionComplete: (selectedLabels: string[]) => void;
@@ -442,7 +442,11 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
                 const payload = buildGeneratePayload();
                 if (!payload) return;
                 payload['内容'] = selectedLabels.join('，');
-                logger.event('生图任务载荷', { payload });
+                const cfg = getConfig();
+                const base = cfg.api.baseUrl || `http://${cfg.api.backendHost}:${cfg.api.backendPort}`;
+                const path = cfg.api.endpoints.generate || '/tasks/generate';
+                const url = `${base}${path}`;
+                logger.event('生图任务载荷', { payload, path, url });
                 const res = await generateImageTask(payload);
                 logger.info('已提交生图任务', { task: res });
               } catch (e) {

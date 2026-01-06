@@ -18,7 +18,7 @@ from .api.routes_nodes_tree import router as nodes_tree_router
 from .utils.logger import get_logger
 import time
 
-app = FastAPI(default_response_class=ORJSONResponse, title="cineMind Backend", version="0.1.0")
+app = FastAPI(default_response_class=ORJSONResponse, title="cineMind Backend", version="0.2.0")
 
 log = get_logger()
 

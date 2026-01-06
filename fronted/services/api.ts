@@ -104,6 +104,13 @@ const resolutionToWxH = (resolution: string, ratio: string): string => {
   return byRatio[resolution] || byRatio['720p'];
 };
 
+const makeUuid = (): string => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return (crypto as any).randomUUID();
+  const hex = (n: number) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+  const s = `${hex(8)}-${hex(4)}-4${hex(3)}-${((8 + Math.floor(Math.random() * 4)).toString(16))}${hex(3)}-${hex(12)}`;
+  return s;
+};
+
 export interface GenerateTaskPayload {
   任务ID: string;
   影片类型: string;
@@ -131,13 +138,28 @@ export const generateImageTask = async (payload: Omit<GenerateTaskPayload, '分�
   const ratio = payload.图像比例 || ui.aspectRatios?.[0] || '16:9';
   const resKey = payload.resolutionKey || ui.resolutions?.[1] || '720p';
   const wxh = resolutionToWxH(resKey, ratio);
+  
+  // Filter out keys starting with "关键词_"
+  const filteredPayload: Record<string, any> = {};
+  Object.keys(payload).forEach(key => {
+    if (!key.startsWith('关键词_')) {
+      filteredPayload[key] = (payload as any)[key];
+    }
+  });
+
   const finalPayload = {
-    任务ID: payload.任务ID,
+    ...filteredPayload,
+    任务ID: (payload.任务ID && typeof payload.任务ID === 'string' && payload.任务ID.length === 36) ? payload.任务ID : makeUuid(),
     图像比例: ratio,
     分辨率: wxh,
     内容: (payload as any)['内容'] || '',
   };
-  const data = await request<{ task_id: string; queued_at: string }>(api.endpoints.generate || '/generate', {
+  
+  // Clean up utility keys that shouldn't be sent if they exist in payload but not filtered
+  delete (finalPayload as any).resolutionKey;
+  delete (finalPayload as any).ratioKey;
+
+  const data = await request<{ task_id: string; queued_at: string }>(api.endpoints.generate || '/tasks/generate', {
     method: 'POST',
     body: JSON.stringify(finalPayload),
   });

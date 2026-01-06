@@ -51,7 +51,7 @@
         "id": "task_generate",
         "name": "生成作图提示词",
         "system": "身份：资深影像提示词工程师 + z-image作图提示词专家。职责：根据标准化输入内容生成符合z-image作图要求的提示词（中英文对照），并包含构图要素与技术参数。",
-        "user_template": "输入(JSON)：\\n- task_id: {task_id}\\n- image_ratio: {image_ratio}\\n- resolution: {resolution}\\n- content: {content}\\n请输出：\\n[中文提示词]: 以专业摄影与美术语言，凝练为一条中文成品提示词，覆盖主体、环境、光线、构图、镜头语言与风格；包含必要技术参数（比例、分辨率）。\\n[English Prompt]: 以专业摄影与艺术词汇生成等价英文提示，参数与语义一致。"
+        "user_template": "输入关键词(json)：image_ratio: {image_ratio}, {content}. 请输出：\n[中文提示词]: 以专业摄影与美术语言，凝练为一条中文成品提示词，覆盖主体、环境、光线、构图、镜头语言与风格；包含必要技术参数（比例、分辨率）。\n[English Prompt]: 以专业摄影与艺术词汇生成等价英文提示，参数与语义一致。"
       }
     ]
   },

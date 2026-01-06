@@ -28,7 +28,7 @@ class QwenClient:
         payload = {"model": self.model, "messages": messages}
         rid = str(uuid.uuid4())
         try:
-            preview = "\n".join([f"{m.get('role','')}: {str(m.get('content',''))[:200]}" for m in messages])
+            preview = "\n".join([f"{m.get('role','')}: {str(m.get('content',''))}" for m in messages])
             self.log.info(f"[qwen:req] id={rid} model={self.model} url={self.base_url} messages=\n{preview}")
         except Exception:
             pass
@@ -41,7 +41,7 @@ class QwenClient:
                         # OpenAI compatible response
                         content = data.get("choices", [{}])[0].get("message", {}).get("content", "") or ""
                         try:
-                            self.log.info(f"[qwen:res] id={rid} status=200 len={len(content)} body={content[:800]}")
+                            self.log.info(f"[qwen:res] id={rid} status=200 len={len(content)} body={content}")
                         except Exception:
                             pass
                         return content
@@ -60,7 +60,21 @@ class QwenClient:
         tpl = user_template or f"中文要素: {zh_seed}\nEnglish seed: {en_seed}\nStyle hints: {', '.join(style_hints)}\nNegative: {self.default_negative}\n请给出中文和英文的成品提示词。"
         labels_joined = " > ".join(labels) if labels else text
         neg = negative_override or self.default_negative
-        content = tpl.format(labels_joined=labels_joined, negative_prompt=neg, top=str(payload.get('top') or 10))
+        
+        # Safe format
+        try:
+            # 只有当 user_template 为空或者不是从 process_task 传入的（process_task 已经处理过格式化了）
+            # 才进行格式化。
+            # 但这里有一个简单的判断：如果 tpl 中包含 {labels_joined} 或 {negative_prompt} 这样的占位符，才进行格式化。
+            if "{labels_joined}" in tpl or "{negative_prompt}" in tpl:
+                 content = tpl.format(labels_joined=labels_joined, negative_prompt=neg, top=str(payload.get('top') or 10))
+            else:
+                 content = tpl
+        except Exception:
+            # 如果格式化失败（例如 tpl 中有 JSON 的花括号），则回退到直接使用 tpl
+            # 这通常发生在 process_task 已经处理过 tpl 并传入了包含 JSON 的字符串
+            content = tpl
+
         role = role_override or self.role_prompt
         msg = [{"role": "system", "content": role}, {"role": "user", "content": content}]
         resp = await self._chat(msg)

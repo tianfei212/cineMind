@@ -1,4 +1,5 @@
 import { loadConfig, getConfig } from './configService';
+import { logger } from '../utils/logger';
 
 export class HttpError extends Error {
   status: number;
@@ -26,6 +27,7 @@ const ensureConfig = async () => {
 
 const buildUrl = (path: string) => {
   const { api } = getConfig();
+  if (api.baseUrl === "" || (!api.baseUrl && !api.backendHost)) return path;
   const base = api.baseUrl || `http://${api.backendHost}:${api.backendPort}`;
   return `${base}${path}`;
 };
@@ -43,6 +45,7 @@ export const request = async <T>(path: string, options: RequestOptions = {}): Pr
   const run = async (): Promise<T> => {
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      logger.event('提交后端URL', { url, method: (options.method || 'GET') });
       const res = await fetch(url, { ...options, headers, signal: controller.signal });
       const contentType = res.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
@@ -87,9 +90,24 @@ export const request = async <T>(path: string, options: RequestOptions = {}): Pr
 
 export const buildWsUrl = (path: string, query?: Record<string, string | number | boolean>) => {
   const { api } = getConfig();
-  const base = api.baseUrl || `http://${api.backendHost}:${api.backendPort}`;
-  const proto = base.startsWith('https') ? 'wss' : 'ws';
-  const u = new URL(base);
+  let base = api.baseUrl || (api.backendHost ? `http://${api.backendHost}:${api.backendPort}` : '');
+  
+  if (!base) {
+     // Derive from current location if baseUrl is empty
+     const loc = window.location;
+     const proto = loc.protocol === 'https:' ? 'wss' : 'ws';
+     base = `${proto}://${loc.host}`; // host includes port
+  } else {
+     const proto = base.startsWith('https') ? 'wss' : 'ws';
+     const u = new URL(base);
+     base = `${proto}://${u.host}`;
+  }
+  
+  // If base is derived from http protocol string, convert to ws
+  if (base.startsWith('http')) {
+     base = base.replace(/^http/, 'ws');
+  }
+
   const q = query ? new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)])).toString() : '';
-  return `${proto}://${u.host}${path}${q ? `?${q}` : ''}`;
+  return `${base}${path}${q ? `?${q}` : ''}`;
 };

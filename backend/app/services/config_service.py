@@ -30,5 +30,14 @@ class ConfigService:
             os.environ["QWEN_ROLE_PROMPT"] = prompts["role"]
         if prompts.get("default_negative_prompt"):
             os.environ["QWEN_NEGATIVE_PROMPT"] = prompts["default_negative_prompt"]
+        if endpoints.get("z_image"):
+            os.environ["Z_IMAGE_BASE_URL"] = endpoints["z_image"]
+        if api_keys.get("z_image"):
+            os.environ["Z_IMAGE_API_KEY"] = api_keys["z_image"]
+        if models.get("z_image"):
+            os.environ["Z_IMAGE_MODEL"] = models["z_image"]
+        if endpoints.get("wan"):
+            os.environ["WAN_BASE_URL"] = endpoints["wan"]
+        if api_keys.get("wan"):
+            os.environ["WAN_API_KEY"] = api_keys["wan"]
         return cfg
-

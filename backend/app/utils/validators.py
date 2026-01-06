@@ -11,7 +11,7 @@ def is_uuid(s: str) -> bool:
 
 
 def is_ratio(s: str) -> bool:
-    return bool(re.fullmatch(r"\d+:\d+", s))
+    return bool(re.fullmatch(r"\d+(?:\.\d+)?:\d+(?:\.\d+)?", s))
 
 
 def is_resolution(s: str) -> bool:
