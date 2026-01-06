@@ -92,6 +92,57 @@ export const stepSuggest = async (items: { type: string; label: string }[], targ
   });
   return data;
 };
+
+const resolutionToWxH = (resolution: string, ratio: string): string => {
+  const table: Record<string, Record<string, string>> = {
+    '16:9': { '480p': '854x480', '720p': '1280x720', '1k': '1920x1080', '2k': '2560x1440' },
+    '4:3': { '480p': '640x480', '720p': '960x720', '1k': '1440x1080', '2k': '2048x1536' },
+    '1:1': { '480p': '480x480', '720p': '720x720', '1k': '1024x1024', '2k': '2048x2048' },
+    '2.35:1': { '480p': '854x363', '720p': '1280x545', '1k': '1920x817', '2k': '2560x1091' },
+  };
+  const byRatio = table[ratio] || table['16:9'];
+  return byRatio[resolution] || byRatio['720p'];
+};
+
+export interface GenerateTaskPayload {
+  任务ID: string;
+  影片类型: string;
+  环境背景: string;
+  主角类型?: string;
+  角色个体?: string;
+  精彩瞬间?: string;
+  关键元素?: string;
+  镜头语言?: string;
+  年代?: string;
+  图像比例: string;
+  分辨率: string;
+  关键词_影片类型?: string[];
+  关键词_环境背景?: string[];
+  关键词_主角类型?: string[];
+  关键词_角色个体?: string[];
+  关键词_精彩瞬间?: string[];
+  关键词_关键元素?: string[];
+  关键词_镜头语言?: string[];
+  关键词_年代?: string[];
+}
+
+export const generateImageTask = async (payload: Omit<GenerateTaskPayload, '分辨率'> & { 分辨率: string; ratioKey?: string; resolutionKey?: string }) => {
+  const { ui, api } = getConfig();
+  const ratio = payload.图像比例 || ui.aspectRatios?.[0] || '16:9';
+  const resKey = payload.resolutionKey || ui.resolutions?.[1] || '720p';
+  const wxh = resolutionToWxH(resKey, ratio);
+  const finalPayload = {
+    任务ID: payload.任务ID,
+    图像比例: ratio,
+    分辨率: wxh,
+    内容: (payload as any)['内容'] || '',
+  };
+  const data = await request<{ task_id: string; queued_at: string }>(api.endpoints.generate || '/generate', {
+    method: 'POST',
+    body: JSON.stringify(finalPayload),
+  });
+  return data;
+};
 export const createMindNode = async (content: string): Promise<{ node_id: string }> => {
   const { api } = getConfig();
   const data = await request<{ node_id: string }>(`/nodes`, {

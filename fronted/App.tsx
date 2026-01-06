@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AspectRatio, Resolution, GeneratedImage, AppConfig } from './types';
-import { generateCinematicImage } from './services/geminiService';
 import { loadConfig } from './services/configService';
 import MindMap from './components/MindMap';
 
@@ -45,25 +44,11 @@ const App: React.FC = () => {
   const handleGenerate = async (selectedLabels: string[]) => {
     if (loading) return;
     setLoading(true);
-    // 将灵感标签数组转换为描述性 Prompt
-    const promptString = selectedLabels.join(", ");
-    const imageUrl = await generateCinematicImage(promptString, ratio);
-    if (imageUrl) {
-      const newImage: GeneratedImage = {
-        id: Math.random().toString(36).substr(2, 9),
-        url: imageUrl,
-        timestamp: Date.now(),
-        prompt: promptString,
-        config: { ratio, resolution: res }
-      };
-      setImages(prev => [newImage, ...prev]);
-    }
     setLoading(false);
   };
 
   const handleMindMapComplete = (selectedLabels: string[]) => {
     setShowInspiration(false);
-    handleGenerate(selectedLabels);
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -315,6 +300,8 @@ const App: React.FC = () => {
           <MindMap 
             onSelectionComplete={handleMindMapComplete} 
             onClose={() => setShowInspiration(false)} 
+            ratio={ratio}
+            resolutionKey={res}
           />
         )}
       </AnimatePresence>

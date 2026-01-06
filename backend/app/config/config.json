@@ -1,9 +1,9 @@
 {
   "operation_mode": "config_file",
   "api_keys": {
-    "dashscope": "",
-    "z_image": "",
-    "wan": ""
+    "dashscope": "sk-f529fce2b0d44c54b8704bb96383a040",
+    "z_image": "sk-f529fce2b0d44c54b8704bb96383a040",
+    "wan": "sk-f529fce2b0d44c54b8704bb96383a040"
   },
   "models": {
     "qwen": "qwen-max",
@@ -20,7 +20,7 @@
     "output_dir": "outputs"
   },
   "prompts": {
-    "role": "You are an expert AI image generation prompt engineer. Your goal is to rewrite the user's input into a highly detailed, descriptive, and artistic prompt suitable for high-end image generation models. You should also provide a comprehensive negative prompt to avoid common artifacts.",
+    "role": "身份：资深影像提示词工程师 + z-image作图提示词专家。职责：根据标准化输入生成符合z-image作图规范的中英文提示词，包含构图要素与技术参数。",
     "default_negative_prompt": "文字，水印，签名，模糊，重影，低对比度，畸形肢体，图标",
     "flows": [
       {
@@ -46,6 +46,12 @@
         "name": "逐层递进建议",
         "system": "角色：你是资深影像提示词工程师兼图片创意专家。岗位职责：根据输入的关键提示词生成优化后的新的关键提示词。工作内容：1) 接收动态参数[影片类型:{界面传入的影片类型名称}]作为核心输入条件；2) 针对每次叠加选择的影片类型组合生成精准匹配的提示词；3) 严格输出10个独立的关键提示词；4) 每个关键词必须具备高检索价值、反映影片类型特征、且无重复；5) 输出格式：纯文本连续排列，每行一个关键词，禁止编号/标点/解释；6) 需适配多轮叠加的影片类型组合场景；7) 确保生成的关键词符合专业影像创作标准。",
         "user_template": "请基于影片类型组合「{film_combo}」为目标类别「{target}」生成Top{top}条中文关键提示词。严格格式：仅输出纯中文关键词列表，每行恰好一个关键词；禁止任何编号、标点、符号或解释；总行数必须为{top}；每个关键词独立且具备检索价值。"
+      },
+      {
+        "id": "task_generate",
+        "name": "生成作图提示词",
+        "system": "身份：资深影像提示词工程师 + z-image作图提示词专家。职责：根据标准化输入内容生成符合z-image作图要求的提示词（中英文对照），并包含构图要素与技术参数。",
+        "user_template": "输入(JSON)：\\n- task_id: {task_id}\\n- image_ratio: {image_ratio}\\n- resolution: {resolution}\\n- content: {content}\\n请输出：\\n[中文提示词]: 以专业摄影与美术语言，凝练为一条中文成品提示词，覆盖主体、环境、光线、构图、镜头语言与风格；包含必要技术参数（比例、分辨率）。\\n[English Prompt]: 以专业摄影与艺术词汇生成等价英文提示，参数与语义一致。"
       }
     ]
   },

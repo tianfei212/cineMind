@@ -67,15 +67,26 @@ class QwenClient:
         if not resp:
             self.log.info(f"[qwen:fallback_prompts] zh_seed_len={len(zh_seed)} en_seed_len={len(en_seed)}")
             return {"zh": zh_seed, "en": en_seed, "styleHints": style_hints}
-        # naive split
-        parts = resp.split("\n")
+        # prefer explicit markers
         zh = ""
         en = ""
-        for p in parts:
-            if "中文" in p:
-                zh = p.split("：")[-1].strip()
-            elif "English" in p or "英文" in p:
-                en = p.split(":")[-1].strip()
+        try:
+            import re
+            mzh = re.search(r"\[中文提示词\]\s*[:：]\s*(.+)", resp)
+            men = re.search(r"\[English Prompt\]\s*[:：]\s*(.+)", resp, re.IGNORECASE)
+            if mzh:
+                zh = mzh.group(1).strip()
+            if men:
+                en = men.group(1).strip()
+        except Exception:
+            pass
+        if not zh or not en:
+            parts = resp.split("\n")
+            for p in parts:
+                if "中文" in p:
+                    zh = zh or p.split("：")[-1].strip()
+                elif "English" in p or "英文" in p:
+                    en = en or p.split(":")[-1].strip()
         try:
             self.log.info(f"[qwen:prompts] zh_len={len(zh)} en_len={len(en)}")
         except Exception:

@@ -10,11 +10,13 @@ import { createMindNode, getAiContent, getKeywords, getCinematicTree, aiSuggest,
 interface MindMapProps {
   onSelectionComplete: (selectedLabels: string[]) => void;
   onClose: () => void;
+  ratio: string;
+  resolutionKey: string;
 }
 
 const DESIGN_WIDTH = 1920;
 
-const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
+const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, resolutionKey }) => {
   const [nodes, setNodes] = useState<MindNode[]>([]);
   const [connections, setConnections] = useState<{from: string, to: string}[]>([]);
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
@@ -28,6 +30,8 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
   const [levelLabels, setLevelLabels] = useState<string[]>([]);
   const [aiPrompts, setAiPrompts] = useState<Record<string, { zh: string; en: string }>>({});
   const [aiKeywords, setAiKeywords] = useState<Record<string, string[]>>({});
+  const [kwByCat, setKwByCat] = useState<Record<string, string[]>>({});
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // 载入数据树：优先后端，否则配置
   useEffect(() => {
@@ -176,6 +180,10 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
   };
 
   const handleNodeLeftClick = async (node: MindNode) => {
+    if (isSubmitting) {
+      logger.info('正在提交生图任务，忽略节点点击');
+      return;
+    }
     // If we just finished dragging, ignore the click
     if (isDraggingRef.current) return;
 
@@ -205,6 +213,7 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
       try {
         const res = await stepSuggest(ctx, nextType, 10);
         setAiKeywords(prev => ({ ...prev, [node.id]: res.items }));
+        setKwByCat(prev => ({ ...prev, [nextType]: res.items }));
         spawnChildrenFromLabels(node, res.items);
         logger.event('逐层建议', { context: ctx, target: res.target_type, items: res.items });
       } catch (e) {
@@ -255,6 +264,7 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
     try {
       const res = await stepSuggest(ctx, nextType, 10);
       setAiKeywords(prev => ({ ...prev, [node.id]: res.items }));
+      setKwByCat(prev => ({ ...prev, [nextType]: res.items }));
       spawnChildrenFromLabels(node, res.items);
       logger.event('逐层建议', { context: ctx, target: res.target_type, items: res.items });
     } catch (e) {
@@ -263,6 +273,10 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
   };
 
   const toggleSelect = async (node: MindNode) => {
+    if (isSubmitting) {
+      logger.info('正在提交生图任务，忽略节点选择');
+      return;
+    }
     setNodes(prev => prev.map(n => {
       if (n.level === node.level) {
         if (n.id === node.id) {
@@ -284,6 +298,7 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
     try {
       const res = await stepSuggest(ctx, nextType, 10);
       setAiKeywords(prev => ({ ...prev, [node.id]: res.items }));
+      setKwByCat(prev => ({ ...prev, [nextType]: res.items }));
       spawnChildrenFromLabels(node, res.items);
       logger.event('逐层建议(选择)', { context: ctx, target: res.target_type, items: res.items });
     } catch (e) {
@@ -310,6 +325,42 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
   const selectedLabels = nodes.filter(n => n.isSelected).map(n => n.label);
   const stashX = window.innerWidth - 80;
   const stashY = window.innerHeight - 80;
+
+  const buildGeneratePayload = (): any | null => {
+    const byLevel: Record<number, MindNode | undefined> = {};
+    nodes.forEach(n => { if (n.isSelected) byLevel[n.level] = n; });
+    const getLabel = (name: string) => {
+      const idx = levelLabels.indexOf(name);
+      const node = idx >= 0 ? byLevel[idx] : undefined;
+      return node?.label;
+    };
+    const film = getLabel('影片类型');
+    const env = getLabel('环境背景');
+    if (!film || !env) {
+      logger.error('生成任务失败：缺少必选项', { film, env });
+      return null;
+    }
+    const payload: any = {
+      任务ID: (typeof crypto !== 'undefined' && 'randomUUID' in crypto) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+      影片类型: film,
+      环境背景: env,
+      主角类型: getLabel('主角类型'),
+      角色个体: getLabel('角色个体'),
+      精彩瞬间: getLabel('精彩瞬间'),
+      关键元素: getLabel('关键元素'),
+      镜头语言: getLabel('镜头语言'),
+      年代: getLabel('年代'),
+      图像比例: ratio,
+      resolutionKey: resolutionKey,
+    };
+    const addKw = (cat: string) => {
+      if (kwByCat[cat] && kwByCat[cat].length > 0) {
+        payload[`关键词_${cat}`] = kwByCat[cat];
+      }
+    };
+    ['影片类型', '环境背景', '主角类型', '角色个体', '精彩瞬间', '关键元素', '镜头语言', '年代'].forEach(addKw);
+    return payload;
+  };
 
   return (
     <motion.div 
@@ -387,15 +438,21 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
             onClick={async () => {
               logger.event('提交选择', { selectedLabels });
               try {
-                const tree = await getCinematicTree();
-                setDataTree(tree as any);
-                logger.info('灵感触发：从后端获取 cinematicTree 成功');
+                setIsSubmitting(true);
+                const payload = buildGeneratePayload();
+                if (!payload) return;
+                payload['内容'] = selectedLabels.join('，');
+                logger.event('生图任务载荷', { payload });
+                const res = await generateImageTask(payload);
+                logger.info('已提交生图任务', { task: res });
               } catch (e) {
-                logger.error('灵感触发：获取 cinematicTree 失败', e as any);
+                logger.error('提交生图任务失败', e as any);
+              } finally {
+                setIsSubmitting(false);
               }
               onSelectionComplete(selectedLabels);
             }}
-            disabled={selectedLabels.length === 0}
+            disabled={selectedLabels.length === 0 || isSubmitting}
             className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold tracking-widest transition-all shadow-xl shadow-blue-600/20 disabled:opacity-30 disabled:grayscale"
           >
             渲染创意方案
