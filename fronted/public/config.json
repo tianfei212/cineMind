@@ -20,9 +20,17 @@
     "blurIntensity": 10
     ,
     "mainOpacity": 100
+    ,
+    "aspectRatios": ["16:9", "4:3", "2.35:1", "1:1"],
+    "resolutions": ["480p", "720p", "1k", "2k"]
+    ,
+    "levelLabels": ["影片类型", "环境背景", "角色个体", "精彩瞬间", "关键元素", "镜头语言", "年代"]
   },
   "api": {
     "baseUrl": "http://localhost:3000",
+    "frontendPort": 3001,
+    "backendHost": "localhost",
+    "backendPort": 3000,
     "timeout": 30000,
     "endpoints": {
       "generate": "/generate",
@@ -32,13 +40,192 @@
   "defaultData": {
     "cinematicTree": {
       "label": "起点",
+      "desc": "电影构图发散树的根节点",
       "children": [
-        { "label": "赛博霓虹都市" },
-        { "label": "古典荒野秘境" },
-        { "label": "废土漫游荒原" },
-        { "label": "极地冰川基地" },
-        { "label": "深海亚特兰蒂斯" }
+        {
+          "label": "科幻",
+          "desc": "影片类型：未来科技、宇宙探索、人工智能等主题",
+          "children": [
+            { "label": "极致抑郁雨夜", "desc": "气氛" ,
+              "children": [
+                { "label": "赛博霓虹窄巷", "desc": "场景",
+                  "children": [
+                    { "label": "孤僻的赛博黑客", "desc": "角色个体",
+                      "children": [
+                        { "label": "子弹静止瞬间", "desc": "精彩瞬间",
+                          "children": [
+                            { "label": "破碎的玻璃幕墙", "desc": "关键元素",
+                              "children": [
+                                { "label": "极广角俯拍", "desc": "镜头语言",
+                                  "children": [{ "label": "近未来 2049" }, { "label": "当代现状" }]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "label": "二次元动漫",
+          "desc": "影片类型：动画美学、夸张表现、幻想叙事",
+          "children": [
+            { "label": "唯美梦幻黄昏", "children": [
+              { "label": "云端浮空实验室", "children": [
+                { "label": "叛逆的仿生人", "children": [
+                  { "label": "冲破牢笼的呐喊", "children": [
+                    { "label": "神秘的几何符号", "children": [
+                      { "label": "环绕升降镜头", "children": [{ "label": "近未来 2049" }] }
+                    ] }
+                  ] }
+                ] }
+              ] }
+            ] }
+          ]
+        },
+        {
+          "label": "纪实电影",
+          "desc": "影片类型：真实事件、观察视角、社会议题",
+          "children": [
+            { "label": "喧嚣狂热白昼", "children": [
+              { "label": "荒漠中的补给站", "children": [
+                { "label": "无名的都市过客", "children": [
+                  { "label": "秘密交易的达成", "children": [
+                    { "label": "漂浮的全息投影", "children": [
+                      { "label": "主观视角(POV)", "children": [{ "label": "当代现状" }] }
+                    ] }
+                  ] }
+                ] }
+              ] }
+            ] }
+          ]
+        },
+        {
+          "label": "浪漫电影",
+          "desc": "影片类型：爱情叙事、诗意表达、情感抒发",
+          "children": [
+            { "label": "史诗壮丽黎明", "children": [
+              { "label": "维多利亚歌剧院", "children": [
+                { "label": "优雅的致命特工", "children": [
+                  { "label": "雨中的狂热拥吻", "children": [
+                    { "label": "燃烧的古旧信件", "children": [
+                      { "label": "黄金比例中景", "children": [{ "label": "摩登 1960s" }] }
+                    ] }
+                  ] }
+                ] }
+              ] }
+            ] }
+          ]
+        },
+        {
+          "label": "惊恐电影",
+          "desc": "影片类型：恐惧心理、未知威胁、压迫氛围",
+          "children": [
+            { "label": "诡异寂静午夜", "children": [
+              { "label": "废弃的巨型教堂", "children": [
+                { "label": "冷血的赏金猎人", "children": [
+                  { "label": "双雄巅峰对峙", "children": [
+                    { "label": "古老的藤蔓缠绕", "children": [
+                      { "label": "低角度仰拍", "children": [{ "label": "当代现状" }] }
+                    ] }
+                  ] }
+                ] }
+              ] }
+            ] }
+          ]
+        },
+        {
+          "label": "动作电影",
+          "desc": "影片类型：速度与力量、强对抗、高张力",
+          "children": [
+            { "label": "喧嚣狂热白昼", "children": [
+              { "label": "赛博霓虹窄巷", "children": [
+                { "label": "末世的幸存小队", "children": [
+                  { "label": "废墟中的重生", "children": [
+                    { "label": "巨大的机械残骸", "children": [
+                      { "label": "手持晃动镜头", "children": [{ "label": "远未来 2700" }] }
+                    ] }
+                  ] }
+                ] }
+              ] }
+            ] }
+          ]
+        },
+        {
+          "label": "悬疑电影",
+          "desc": "影片类型：谜题结构、反转叙事、心理张力",
+          "children": [
+            { "label": "寒冷刺骨浓雾", "children": [
+              { "label": "极地科研基站", "children": [
+                { "label": "疯狂的边缘科学家", "children": [
+                  { "label": "致命的背刺一击", "children": [
+                    { "label": "斑驳的金属纹理", "children": [
+                      { "label": "浅景深特写", "children": [{ "label": "当代现状" }] }
+                    ] }
+                  ] }
+                ] }
+              ] }
+            ] }
+          ]
+        },
+        {
+          "label": "历史史诗",
+          "desc": "影片类型：宏大叙事、时代冲突、文明史诗",
+          "children": [
+            { "label": "唯美梦幻黄昏", "children": [
+              { "label": "欧洲中世纪古堡", "children": [
+                { "label": "高贵的堕落贵族", "children": [
+                  { "label": "夕阳下的告别", "children": [
+                    { "label": "神秘的几何符号", "children": [
+                      { "label": "对称式构图", "children": [{ "label": "中世纪纪元" }] }
+                    ] }
+                  ] }
+                ] }
+              ] }
+            ] }
+          ]
+        },
+        {
+          "label": "奇幻电影",
+          "desc": "影片类型：魔法设定、非现实世界、象征寓言",
+          "children": [
+            { "label": "神圣静谧空间", "children": [
+              { "label": "深海沉没都市", "children": [
+                { "label": "隐居的秘法祭司", "children": [
+                  { "label": "神启般的顿悟", "children": [
+                    { "label": "神秘的几何符号", "children": [
+                      { "label": "长镜头跟随", "children": [{ "label": "上古神话时代" }] }
+                    ] }
+                  ] }
+                ] }
+              ] }
+            ] }
+          ]
+        },
+        {
+          "label": "黑色幽默",
+          "desc": "影片类型：荒诞讽刺、反讽喜剧、黑色风格",
+          "children": [
+            { "label": "史诗壮丽黎明", "children": [
+              { "label": "外星殖民地码头", "children": [
+                { "label": "优雅的致命特工", "children": [
+                  { "label": "秘密交易的达成", "children": [
+                    { "label": "流动的液态金属", "children": [
+                      { "label": "主观视角(POV)", "children": [{ "label": "千禧年 2000s" }] }
+                    ] }
+                  ] }
+                ] }
+              ] }
+            ] }
+          ]
+        }
       ]
-    }
+    },
+    "is_from_db_load": false
   }
 }

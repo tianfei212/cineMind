@@ -17,6 +17,7 @@ export interface GeneratedImage {
 export interface CinematicNode {
   label: string;
   children?: CinematicNode[];
+  desc?: string;
 }
 
 export interface MindNode {
@@ -50,6 +51,9 @@ export interface AppConfig {
     };
     blurIntensity?: number;
     mainOpacity?: number;
+    aspectRatios?: AspectRatio[];
+    resolutions?: Resolution[];
+    levelLabels?: string[];
   };
   api: {
     baseUrl: string;
@@ -58,8 +62,12 @@ export interface AppConfig {
       generate: string;
       nodes: string;
     };
+    frontendPort?: number;
+    backendHost?: string;
+    backendPort?: number;
   };
   defaultData: {
     cinematicTree: CinematicNode;
+    is_from_db_load?: boolean;
   };
 }

@@ -26,6 +26,12 @@ const App: React.FC = () => {
     const initConfig = async () => {
       const cfg = await loadConfig();
       setConfig(cfg);
+      if (cfg.ui.aspectRatios && cfg.ui.aspectRatios.length > 0) {
+        setRatio(cfg.ui.aspectRatios[0]);
+      }
+      if (cfg.ui.resolutions && cfg.ui.resolutions.length > 0) {
+        setRes(cfg.ui.resolutions[0]);
+      }
       if (cfg?.ui?.background?.url) {
         document.body.style.backgroundImage = `url(${cfg.ui.background.url})`;
         document.body.style.backgroundSize = 'cover';
@@ -163,7 +169,7 @@ const App: React.FC = () => {
                 图像比例 / Aspect Ratio
               </label>
               <div className="grid grid-cols-4 gap-3 bg-black/5 p-1.5 rounded-[1.5rem] border border-black/5">
-                {(["16:9", "4:3", "2.35:1", "1:1"] as AspectRatio[]).map(r => (
+                {(config.ui.aspectRatios ?? (["16:9", "4:3", "2.35:1", "1:1"] as AspectRatio[])).map(r => (
                   <button
                     key={r}
                     onClick={() => setRatio(r)}
@@ -181,7 +187,7 @@ const App: React.FC = () => {
                 分辨率 / Resolution
               </label>
               <div className="flex gap-3">
-                {(["480p", "720p", "1k", "2k"] as Resolution[]).map(r => (
+                {(config.ui.resolutions ?? (["480p", "720p", "1k", "2k"] as Resolution[])).map(r => (
                   <button
                     key={r}
                     onClick={() => setRes(r)}

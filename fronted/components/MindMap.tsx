@@ -1,10 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CINEMATIC_TREE } from '../constants/cinematicData';
-import { CATEGORIES } from '../services/geminiService';
 import { MindNode, CinematicNode } from '../types';
-import { getConfig } from '../services/configService';
+import { getConfig, loadConfig } from '../services/configService';
 
 interface MindMapProps {
   onSelectionComplete: (selectedLabels: string[]) => void;
@@ -18,14 +16,48 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
   const [connections, setConnections] = useState<{from: string, to: string}[]>([]);
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
+  const [dataTree, setDataTree] = useState<CinematicNode | null>(null);
   const canvasRef = React.useRef<HTMLDivElement | null>(null);
-  
   // Ref to track if we are currently dragging
   const isDraggingRef = React.useRef(false);
   // Ref for long press timer
   const longPressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [levelLabels, setLevelLabels] = useState<string[]>([]);
 
-  // 初始化显示第一层：环境背景
+  // 载入数据树：优先后端，否则配置
+  useEffect(() => {
+    const loadTree = async () => {
+      try {
+        let cfg: any;
+        try {
+          cfg = getConfig();
+        } catch {
+          cfg = await loadConfig();
+        }
+        setLevelLabels(cfg.ui.levelLabels ?? ["影片类型", "环境背景", "角色个体", "精彩瞬间", "关键元素", "镜头语言", "年代"]);
+        if (cfg.defaultData.is_from_db_load) {
+          const resp = await fetch(`${cfg.api.baseUrl}${cfg.api.endpoints.nodes}`);
+          if (resp.ok) {
+            const tree = await resp.json();
+            setDataTree(tree);
+            return;
+          }
+        }
+        setDataTree(cfg.defaultData.cinematicTree);
+      } catch {
+        try {
+          const cfg = await loadConfig();
+          setLevelLabels(cfg.ui.levelLabels ?? ["影片类型", "环境背景", "角色个体", "精彩瞬间", "关键元素", "镜头语言", "年代"]);
+          setDataTree(cfg.defaultData.cinematicTree);
+        } catch {
+          setDataTree(null);
+        }
+      }
+    };
+    loadTree();
+  }, []);
+
+  // 初始化显示第一层
   useEffect(() => {
     const updateScale = () => {
         const currentScale = window.innerWidth / DESIGN_WIDTH;
@@ -38,9 +70,9 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
     const rootY = window.innerHeight / 2;
     const currentScale = window.innerWidth / DESIGN_WIDTH;
     
-    if (CINEMATIC_TREE.children) {
-      const initialNodes: MindNode[] = CINEMATIC_TREE.children.map((child, i) => {
-        const count = CINEMATIC_TREE.children!.length;
+    if (dataTree?.children) {
+      const initialNodes: MindNode[] = dataTree.children.map((child, i) => {
+        const count = dataTree.children!.length;
         const angle = (i / count) * Math.PI * 2;
         const radius = 280 * currentScale;
         return {
@@ -56,7 +88,7 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
     }
     
     return () => window.removeEventListener('resize', updateScale);
-  }, []);
+  }, [dataTree]);
 
   const getDescendantIds = (parentId: string, allNodes: MindNode[]): string[] => {
     const children = allNodes.filter(n => n.parentId === parentId);
@@ -109,7 +141,7 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
     };
 
     const path = getPath(node);
-    const dataNode = findDataNode(path, CINEMATIC_TREE);
+    const dataNode = dataTree ? findDataNode(path, dataTree) : null;
 
     if (dataNode && dataNode.children) {
       const nextLevel = node.level + 1;
@@ -203,7 +235,7 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
         
         <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
           <div className="flex flex-col gap-4">
-            {CATEGORIES.map((cat, i) => {
+            {levelLabels.map((cat, i) => {
               const selectedAtThisLevel = nodes.find(n => n.level === i && n.isSelected);
               return (
                 <div key={cat} className="space-y-2">
@@ -338,7 +370,7 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
                   </span>
                   <div className="h-px w-8 bg-current opacity-20 mb-2" />
                   <span className="text-[0.5625rem] uppercase tracking-[0.25em] font-black opacity-40">
-                    {CATEGORIES[node.level % CATEGORIES.length]}
+                    {levelLabels[node.level % levelLabels.length]}
                   </span>
                 </button>
                 {node.isSelected && (
