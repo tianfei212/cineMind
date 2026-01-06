@@ -32,8 +32,10 @@ export const loadConfig = async (): Promise<AppConfig> => {
           iconUrl: "/assets/logo.svg"
         },
         background: {
-          url: "/assets/background.svg"
-        }
+          url: "/assets/background.png"
+        },
+        blurIntensity: 10,
+        mainOpacity: 5
       },
       api: {
         baseUrl: "http://localhost:3000",

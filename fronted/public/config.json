@@ -6,17 +6,20 @@
       "subtitleEn": "Professional Cinematography"
     },
     "footer": {
-      "text": "CineMind Lab v3.0"
+      "text": "导演创意 v3.0"
     },
     "logo": {
-      "text": "Cine",
-      "highlight": "Mind",
+      "text": "中国电影",
+      "highlight": "AI研究院",
       "color": "text-blue-600",
       "iconUrl": "/assets/logo.svg"
     },
     "background": {
-      "url": "/assets/background.svg"
-    }
+      "url": "/assets/background.png"
+    },
+    "blurIntensity": 10
+    ,
+    "mainOpacity": 100
   },
   "api": {
     "baseUrl": "http://localhost:3000",

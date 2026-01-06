@@ -26,6 +26,12 @@ const App: React.FC = () => {
     const initConfig = async () => {
       const cfg = await loadConfig();
       setConfig(cfg);
+      if (cfg?.ui?.background?.url) {
+        document.body.style.backgroundImage = `url(${cfg.ui.background.url})`;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundPosition = 'center';
+        document.body.style.backgroundRepeat = 'no-repeat';
+      }
     };
     initConfig();
   }, []);
@@ -96,6 +102,10 @@ const App: React.FC = () => {
   const paginatedImages = images.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   if (!config) return null;
+
+  const isGalleryView = !showInspiration && !selectedImage && !loading;
+  const mainOpacityPct = Math.min(100, Math.max(0, isGalleryView ? 0 : (config.ui.mainOpacity ?? 5)));
+  const blurPx = Math.min(100, Math.max(0, isGalleryView ? 0 : (config.ui.blurIntensity ?? 10)));
 
   return (
     <div 
@@ -199,7 +209,11 @@ const App: React.FC = () => {
 
       {/* 右侧展示区 */}
       <main 
-        className="flex-1 h-full flex flex-col overflow-hidden relative bg-gray-50/50 backdrop-blur-sm"
+        className="flex-1 h-full flex flex-col overflow-hidden relative"
+        style={{
+          backdropFilter: `blur(${blurPx}px)`,
+          backgroundColor: `rgba(255,255,255, ${mainOpacityPct / 100})`
+        }}
       >
         <AnimatePresence>
           {loading && (

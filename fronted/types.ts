@@ -48,6 +48,8 @@ export interface AppConfig {
     background: {
       url: string;
     };
+    blurIntensity?: number;
+    mainOpacity?: number;
   };
   api: {
     baseUrl: string;
@@ -61,4 +63,3 @@ export interface AppConfig {
     cinematicTree: CinematicNode;
   };
 }
-

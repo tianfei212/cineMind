@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CINEMATIC_TREE } from '../constants/cinematicData';
 import { CATEGORIES } from '../services/geminiService';
 import { MindNode, CinematicNode } from '../types';
+import { getConfig } from '../services/configService';
 
 interface MindMapProps {
   onSelectionComplete: (selectedLabels: string[]) => void;
@@ -17,6 +18,7 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
   const [connections, setConnections] = useState<{from: string, to: string}[]>([]);
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
+  const canvasRef = React.useRef<HTMLDivElement | null>(null);
   
   // Ref to track if we are currently dragging
   const isDraggingRef = React.useRef(false);
@@ -168,15 +170,25 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
 
   return (
     <motion.div 
+      ref={canvasRef}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-white/95 backdrop-blur-[60px]"
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{
+        backgroundImage: `url(${getConfig().ui.background.url})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backdropFilter: `blur(${getConfig().ui.blurIntensity ?? 10}px)`
+      }}
       onClick={() => setFocusedNodeId(null)}
     >
       {/* 侧边栏 */}
-      <div 
-        className="absolute top-10 left-10 w-80 glass-panel bg-[#121212] p-0 rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 z-30 flex flex-col max-h-[85vh]"
+      <motion.div 
+        drag
+        dragMomentum={false}
+        dragConstraints={canvasRef}
+        className="absolute top-10 left-10 w-80 glass-panel bg-[#121212] p-0 rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 z-30 flex flex-col max-h-[85vh] cursor-move"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 flex justify-between items-center border-b border-white/5">
@@ -225,7 +237,7 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose }) => {
             渲染创意方案
           </button>
         </div>
-      </div>
+      </motion.div>
 
       {/* 画布 */}
       <div className="w-full h-full relative overflow-hidden select-none">
