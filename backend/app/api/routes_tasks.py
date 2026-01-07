@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 from ..utils.response import ok, error
 from ..utils.errors import ErrorCodes
@@ -6,7 +6,7 @@ from ..db.session import SessionLocal
 from ..utils.validators import is_uuid, is_ratio, is_resolution, non_empty_str, normalize_task_payload
 from ..schemas.tasks import TaskAccepted
 from ..models.task import Task
-from ..services.task_service import enqueue_generate, process_task
+from ..services.task_service import enqueue_generate, run_task_background
 from datetime import datetime
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
@@ -39,7 +39,7 @@ def validate_kv(payload: dict) -> bool:
 
 
 @router.post("/generate")
-async def tasks_generate(request: Request, db: Session = Depends(get_db)):
+async def tasks_generate(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     payload = await request.json()
     if not isinstance(payload, dict):
         return error(ErrorCodes.INVALID_PARAM, "invalid generate payload")
@@ -52,12 +52,10 @@ async def tasks_generate(request: Request, db: Session = Depends(get_db)):
     if not validate_kv(payload):
         return error(ErrorCodes.INVALID_PARAM, "invalid generate payload")
     task = await enqueue_generate(db, payload)
-    try:
-        # 立即处理，产生详细日志
-        await process_task(db, task, payload)
-    except Exception as e:
-        from ..utils.logger import get_logger
-        get_logger().error(f"[tasks:generate:error] {str(e)}")
+    
+    # Run in background
+    background_tasks.add_task(run_task_background, task.task_id, payload)
+    
     accepted = TaskAccepted(task_id=task.task_id, queued_at=datetime.utcnow().isoformat())
     return ok(accepted.model_dump(), "accepted")
 
@@ -74,5 +72,5 @@ alias_router = APIRouter(tags=["Tasks"])
 
 
 @alias_router.post("/generate")
-async def alias_generate(request: Request, db: Session = Depends(get_db)):
-    return await tasks_generate(request, db)
+async def alias_generate(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    return await tasks_generate(request, background_tasks, db)

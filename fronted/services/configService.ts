@@ -56,8 +56,8 @@ export const loadConfig = async (): Promise<AppConfig> => {
         },
         blurIntensity: 10,
         mainOpacity: 5,
-        aspectRatios: ["16:9", "4:3", "2.35:1", "1:1"],
-        resolutions: ["480p", "720p", "1k", "2k"],
+        aspectRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "7:9", "9:7", "9:16", "9:21", "16:9", "21:9"],
+        resolutions: ["Standard"],
         levelLabels: ["影片类型", "环境背景", "角色个体", "精彩瞬间", "关键元素", "镜头语言", "年代"]
       },
       api: {

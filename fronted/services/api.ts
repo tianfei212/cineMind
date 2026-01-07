@@ -26,11 +26,14 @@ export const subscribeTask = (taskId: string, onEvent: (e: TaskEvent) => void, o
     ws.onmessage = ev => {
       try {
         const data = JSON.parse(ev.data);
+        console.log('[WS] Received:', data); // Add logging
         if (data && data.type === 'heartbeat') {
           lastHeartbeat = Date.now();
         }
         onEvent(data as TaskEvent);
-      } catch {}
+      } catch (e) {
+          console.error('[WS] Message parse error:', e);
+      }
     };
     ws.onerror = e => {
       if (onError) onError(e);
@@ -95,13 +98,36 @@ export const stepSuggest = async (items: { type: string; label: string }[], targ
 
 const resolutionToWxH = (resolution: string, ratio: string): string => {
   const table: Record<string, Record<string, string>> = {
+    '1:1': { 'Standard': '1536x1536' },
+    '2:3': { 'Standard': '1248x1872' },
+    '3:2': { 'Standard': '1872x1248' },
+    '3:4': { 'Standard': '1296x1728' },
+    '4:3': { 'Standard': '1728x1296' },
+    '7:9': { 'Standard': '1344x1728' },
+    '9:7': { 'Standard': '1728x1344' },
+    '9:16': { 'Standard': '1152x2048' },
+    '9:21': { 'Standard': '864x2016' },
+    '16:9': { 'Standard': '2048x1152' },
+    '21:9': { 'Standard': '2016x864' },
+    '2.35:1': { 'Standard': '2048x870' } // Keeping a reasonable default for 2.35:1 based on 2k width
+  };
+  
+  // Fallback for legacy resolution keys if needed, but primarily use 'Standard'
+  const legacyTable: Record<string, Record<string, string>> = {
     '16:9': { '480p': '854x480', '720p': '1280x720', '1k': '1920x1080', '2k': '2560x1440' },
     '4:3': { '480p': '640x480', '720p': '960x720', '1k': '1440x1080', '2k': '2048x1536' },
     '1:1': { '480p': '480x480', '720p': '720x720', '1k': '1024x1024', '2k': '2048x2048' },
     '2.35:1': { '480p': '854x363', '720p': '1280x545', '1k': '1920x817', '2k': '2560x1091' },
   };
-  const byRatio = table[ratio] || table['16:9'];
-  return byRatio[resolution] || byRatio['720p'];
+
+  const byRatio = table[ratio];
+  if (byRatio && byRatio['Standard']) {
+      return byRatio['Standard'];
+  }
+  
+  // Fallback to legacy behavior if not in new table or resolution is not Standard
+  const legacyByRatio = legacyTable[ratio] || legacyTable['16:9'];
+  return legacyByRatio[resolution] || legacyByRatio['720p'];
 };
 
 const makeUuid = (): string => {
@@ -181,5 +207,31 @@ export const getKeywords = async (nodeId: string, top: number = 10): Promise<{ n
 
 export const getAiContent = async (nodeId: string): Promise<{ node_id: string; prompts: { zh: string; en: string; styleHints: string[] } }> => {
   const data = await request<{ node_id: string; prompts: { zh: string; en: string; styleHints: string[] } }>(`/nodes/${nodeId}/ai-content`, { method: 'GET' });
+  return data;
+};
+
+export interface GalleryItem {
+  id: string;
+  thumbUrl: string;
+  url: string;
+  createTime: string;
+  dimensions: string;
+  prompt: string;
+}
+
+export interface GalleryPage {
+  items: GalleryItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export const getGallery = async (page: number = 1, pageSize: number = 20): Promise<GalleryPage> => {
+  const { api } = getConfig();
+  const host = api.backendHost || 'localhost';
+  const port = api.backendPort || 3002;
+  const base = api.baseUrl || `http://${host}:${port}`;
+  const data = await request<GalleryPage>(`${base}/api/media?page=${page}&pageSize=${pageSize}&sort=createTime,desc`, { method: 'GET' });
   return data;
 };

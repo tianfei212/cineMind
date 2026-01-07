@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AspectRatio, Resolution, GeneratedImage, AppConfig } from './types';
 import { loadConfig } from './services/configService';
 import MindMap from './components/MindMap';
+import { getGallery, GalleryItem, GalleryPage, subscribeTask } from './services/api';
+import { logger } from './utils/logger';
 
 const App: React.FC = () => {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -14,12 +16,38 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
+  const [galleryPage, setGalleryPage] = useState<GalleryPage | null>(null);
 
   // Split screen state
   const [leftWidth, setLeftWidth] = useState(40);
   const [isDragging, setIsDragging] = useState(false);
 
   const ITEMS_PER_PAGE = 20;
+
+  const fetchGallery = async (page: number = 1) => {
+    logger.info(`Fetching gallery page ${page}`);
+    try {
+      const res = await getGallery(page, ITEMS_PER_PAGE);
+      logger.info('Gallery fetched', res);
+      if (res && res.items) {
+        setGalleryPage(res);
+        const mapped: GeneratedImage[] = res.items.map(item => ({
+          id: item.id,
+          url: item.thumbUrl, // Use thumb for gallery
+          fullUrl: item.url, // Store full url
+          timestamp: new Date(item.createTime).getTime(),
+          prompt: item.prompt,
+          config: {
+            ratio: "16:9", // Default or parsed from backend
+            resolution: "1k" // Default or parsed from backend
+          }
+        }));
+        setImages(mapped);
+      }
+    } catch (e) {
+      logger.error('Failed to fetch gallery', e);
+    }
+  };
 
   useEffect(() => {
     const initConfig = async () => {
@@ -40,6 +68,26 @@ const App: React.FC = () => {
     };
     initConfig();
   }, []);
+
+  // Fetch gallery when config is loaded or page changes
+  useEffect(() => {
+    if (config) {
+      fetchGallery(currentPage);
+    }
+  }, [config, currentPage]);
+
+  // Handle refresh events
+  useEffect(() => {
+    const handleRefresh = () => {
+      if (currentPage === 1) {
+        if (config) fetchGallery(1);
+      } else {
+        setCurrentPage(1);
+      }
+    };
+    window.addEventListener('refreshGallery', handleRefresh);
+    return () => window.removeEventListener('refreshGallery', handleRefresh);
+  }, [currentPage, config]);
 
   const handleGenerate = async (selectedLabels: string[]) => {
     if (loading) return;
@@ -89,8 +137,8 @@ const App: React.FC = () => {
     };
   }, [isDragging]);
 
-  const totalPages = Math.ceil(images.length / ITEMS_PER_PAGE);
-  const paginatedImages = images.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalPages = galleryPage?.totalPages || 1;
+  const paginatedImages = images; // Images are already paginated from backend
 
   if (!config) return null;
 
@@ -166,6 +214,7 @@ const App: React.FC = () => {
               </div>
             </div>
 
+            {/* Resolution selector hidden as per request
             <div className="space-y-4">
               <label className="text-[0.625rem] font-black text-black/30 uppercase tracking-[0.4em] flex items-center gap-3">
                 <span className="w-2 h-2 rounded-full bg-blue-500/30" />
@@ -183,6 +232,7 @@ const App: React.FC = () => {
                 ))}
               </div>
             </div>
+            */}
           </div>
         </div>
 
@@ -314,17 +364,22 @@ const App: React.FC = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setSelectedImage(null)}
-            className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-10 cursor-zoom-out"
+            className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-0 cursor-zoom-out"
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
+              initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative max-w-[90vw] max-h-[90vh] shadow-2xl rounded-3xl overflow-hidden"
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative w-full h-full overflow-hidden flex items-center justify-center"
               onClick={(e) => e.stopPropagation()}
             >
-              <img src={selectedImage.url} alt="Full screen" className="object-contain max-h-[85vh] w-auto shadow-2xl" />
-              <div className="absolute top-8 right-8">
+              <img 
+                src={selectedImage.fullUrl || selectedImage.url} 
+                alt="Full screen" 
+                className="object-contain w-full h-full max-w-none max-h-none shadow-2xl" 
+              />
+              
+              <div className="absolute top-8 right-8 z-10">
                 <button 
                   onClick={() => setSelectedImage(null)}
                   className="w-12 h-12 bg-white/10 hover:bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center text-white transition-all"
@@ -332,13 +387,29 @@ const App: React.FC = () => {
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth={2}/></svg>
                 </button>
               </div>
-              <div className="p-10 bg-gradient-to-t from-black/50 to-transparent absolute bottom-0 left-0 right-0 text-white">
-                 <p className="text-sm font-light opacity-80 mb-2">构图详情 / Frame Details</p>
-                 <div className="flex gap-4 items-center">
-                    <span className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-bold uppercase tracking-widest">{selectedImage.config.ratio}</span>
-                    <span className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-bold uppercase tracking-widest">{selectedImage.config.resolution}</span>
-                 </div>
-              </div>
+              
+              {/* Logo Overlay */}
+              {config.ui.logo.iconUrl && (
+                <div className="absolute bottom-8 right-8 z-10 pointer-events-none opacity-80 mix-blend-screen">
+                   <img 
+                     src={config.ui.logo.iconUrl} 
+                     alt="Logo" 
+                     className="h-20 w-auto filter drop-shadow-lg"
+                     onError={(e) => {
+                       // Fallback text if logo fails
+                       const target = e.target as HTMLElement;
+                       target.style.display = 'none';
+                       const parent = target.parentElement;
+                       if (parent) {
+                         const span = document.createElement('span');
+                         span.className = "text-white/50 font-black text-2xl uppercase tracking-[0.5em]";
+                         span.innerText = "CINEMIND";
+                         parent.appendChild(span);
+                       }
+                     }}
+                   />
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}

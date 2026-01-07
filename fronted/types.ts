@@ -1,11 +1,12 @@
 
-export type AspectRatio = "1:1" | "4:3" | "16:9" | "2.35:1";
+export type AspectRatio = "1:1" | "2:3" | "3:2" | "3:4" | "4:3" | "7:9" | "9:7" | "9:16" | "9:21" | "16:9" | "21:9" | "2.35:1";
 
-export type Resolution = "480p" | "720p" | "1k" | "2k";
+export type Resolution = "480p" | "720p" | "1k" | "2k" | "Standard";
 
 export interface GeneratedImage {
   id: string;
   url: string;
+  fullUrl?: string;
   timestamp: number;
   prompt: string;
   config: {

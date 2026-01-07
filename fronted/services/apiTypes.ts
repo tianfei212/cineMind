@@ -16,7 +16,7 @@ export interface GenerateAccepted {
 export type TaskEvent =
   | { type: 'queued'; taskId: string; position: number }
   | { type: 'running'; taskId: string; progress: number }
-  | { type: 'completed'; taskId: string; imageId: string }
+  | { type: 'completed'; taskId: string; imageId: string; imageUrl?: string }
   | { type: 'failed'; taskId: string; error: { code: string; message: string } }
   | { type: 'heartbeat'; ts: string };
 
@@ -48,4 +48,3 @@ export interface ApiFail {
 }
 
 export type ApiResponse<T> = ApiSuccess<T> | ApiFail;
-

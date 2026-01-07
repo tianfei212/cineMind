@@ -5,7 +5,7 @@ import { MindNode, CinematicNode } from '../types';
 import { getConfig, loadConfig } from '../services/configService';
 import { logger } from '../utils/logger';
 import { request } from '../services/httpClient';
-import { createMindNode, getAiContent, getKeywords, getCinematicTree, aiSuggest, stepSuggest, generateImageTask } from '../services/api';
+import { createMindNode, getAiContent, getKeywords, getCinematicTree, aiSuggest, stepSuggest, generateImageTask, subscribeTask } from '../services/api';
 
 interface MindMapProps {
   onSelectionComplete: (selectedLabels: string[]) => void;
@@ -32,6 +32,8 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
   const [aiKeywords, setAiKeywords] = useState<Record<string, string[]>>({});
   const [kwByCat, setKwByCat] = useState<Record<string, string[]>>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [taskStatus, setTaskStatus] = useState<any | null>(null);
+  const subscriptionRef = React.useRef<any>(null);
 
   // 载入数据树：优先后端，否则配置
   useEffect(() => {
@@ -449,12 +451,39 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
                 logger.event('生图任务载荷', { payload, path, url });
                 const res = await generateImageTask(payload);
                 logger.info('已提交生图任务', { task: res });
+
+                if (res && res.task_id) {
+                  setTaskStatus({ status: 'pending', progress: 0 });
+                  logger.info('开始订阅任务状态', { taskId: res.task_id });
+                  subscriptionRef.current = subscribeTask(res.task_id, (data: any) => {
+                    logger.info('收到任务状态更新', { data });
+                    setTaskStatus(data);
+                    
+                    // Auto-trigger refresh and close on completion if needed
+                    if (data.type === 'completed' || data.status === 'completed') {
+                         // Ensure status is updated to completed so UI shows result
+                         setTaskStatus(prev => ({...prev, ...data, status: 'completed'}));
+                         
+                         // Automatically close and refresh after a short delay to show completion
+                         setTimeout(() => {
+                            if (subscriptionRef.current) subscriptionRef.current.close();
+                            setTaskStatus(null);
+                            onSelectionComplete(selectedLabels);
+                            // Trigger refresh on parent
+                            window.dispatchEvent(new Event('refreshGallery'));
+                         }, 1500);
+                    }
+                  }, (err) => {
+                    logger.error('WebSocket 连接错误', err);
+                  });
+                } else {
+                  onSelectionComplete(selectedLabels);
+                }
               } catch (e) {
                 logger.error('提交生图任务失败', e as any);
               } finally {
                 setIsSubmitting(false);
               }
-              onSelectionComplete(selectedLabels);
             }}
             disabled={selectedLabels.length === 0 || isSubmitting}
             className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold tracking-widest transition-all shadow-xl shadow-blue-600/20 disabled:opacity-30 disabled:grayscale"
@@ -588,6 +617,57 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
         <div className="w-px h-5 bg-gray-200"></div>
         <div className="text-[0.625rem] font-black text-gray-400 uppercase tracking-widest">点击空白: 恢复视图</div>
       </div>
+
+      <AnimatePresence>
+        {taskStatus && (
+            <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md"
+            >
+                <div className="bg-[#1a1a1a] p-8 rounded-3xl max-w-lg w-full text-center border border-white/10 shadow-2xl relative">
+                    <button 
+                        onClick={() => {
+                            if (subscriptionRef.current) subscriptionRef.current.close();
+                            setTaskStatus(null);
+                        }} 
+                        className="absolute top-4 right-4 text-white/30 hover:text-white"
+                    >
+                        ✕
+                    </button>
+                    
+                    {taskStatus.status === 'completed' && taskStatus.imageUrl ? (
+                        <div className="space-y-4">
+                            <h3 className="text-2xl font-bold text-[#FFD700]">渲染完成</h3>
+                            <img src={taskStatus.imageUrl} alt="Result" className="w-full rounded-xl border border-white/20" />
+                            <p className="text-white/60 text-sm">即将返回主界面...</p>
+                        </div>
+                    ) : taskStatus.status === 'failed' ? (
+                        <div className="space-y-4">
+                            <div className="text-red-500 text-5xl">⚠</div>
+                            <h3 className="text-xl font-bold text-white">渲染失败</h3>
+                            <p className="text-white/60">{taskStatus.message}</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            <div className="text-4xl animate-bounce">🎨</div>
+                            <h3 className="text-xl font-bold text-white">正在渲染创意方案...</h3>
+                            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                                <motion.div 
+                                    className="h-full bg-[#FFD700]"
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${taskStatus.progress}%` }}
+                                    transition={{ type: "spring", stiffness: 50 }}
+                                />
+                            </div>
+                            <p className="text-sm text-white/40 font-mono">{taskStatus.status} - {taskStatus.progress}%</p>
+                        </div>
+                    )}
+                </div>
+            </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
