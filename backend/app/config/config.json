@@ -1,9 +1,9 @@
 {
   "operation_mode": "config_file",
   "api_keys": {
-    "dashscope": "sk-f529fce2b0d44c54b8704bb96383a040",
-    "z_image": "sk-f529fce2b0d44c54b8704bb96383a040",
-    "wan": "sk-f529fce2b0d44c54b8704bb96383a040"
+    "dashscope": "",
+    "z_image": "",
+    "wan": ""
   },
   "models": {
     "qwen": "qwen-max",
