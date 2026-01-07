@@ -46,7 +46,7 @@ const App: React.FC = () => {
         }));
         setImages(mapped);
         // Set first image as preview if available and no preview set
-        if (mapped.length > 0 && !previewImage) {
+        if (mapped.length > 0 && (!previewImage || page === 1)) {
            setPreviewImage(mapped[0]);
         }
       }

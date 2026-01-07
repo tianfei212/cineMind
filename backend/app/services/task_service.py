@@ -61,11 +61,15 @@ async def process_task(db: Session, task: Task, payload: Dict[str, str]) -> Grap
     pr = cfg.get("prompts") or {}
     flows = pr.get("flows") or []
     tpl = None
+    role = pr.get("role")
+    
     for f in flows:
         if f.get("id") == "task_generate":
             tpl = f.get("user_template")
+            # 优先使用流程配置中的 system 提示词
+            if f.get("system"):
+                role = f.get("system")
             break
-    role = pr.get("role")
     
     # 重新组装 content 字段为 JSON 键值对字符串
     content_dict = {}

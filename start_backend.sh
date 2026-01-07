@@ -114,6 +114,8 @@ fi
 if [ -d "backend" ]; then
     cd backend
     info "已切换到 backend 目录"
+    info "当前 Conda 环境: ${CONDA_DEFAULT_ENV:-$CONDA_ENV}"
+    info "当前目录: $(pwd)"
 elif [ ! -f "app/main.py" ]; then
     # 如果当前不在根目录且找不到 backend 目录，尝试检查是否已经在 backend 目录
     if [ ! -f "app/main.py" ]; then
@@ -122,11 +124,12 @@ elif [ ! -f "app/main.py" ]; then
     fi
 fi
 
-info "启动后端服务 (uvicorn app.main:app) ..."
+info "启动后端服务 (python -m uvicorn app.main:app) ..."
 
 # 使用 nohup 后台启动
 set +e
-nohup uvicorn app.main:app --host "${HOST}" --port "${PORT}" --log-level debug >> "${LOG_FILE}" 2>&1 &
+# 添加 --reload 和 --reload-include "*.json" 以支持热重载
+nohup python -m uvicorn app.main:app --host "${HOST}" --port "${PORT}" --reload --reload-include "*.json" --log-level debug >> "${LOG_FILE}" 2>&1 &
 PID=$!
 set -e
 
@@ -136,6 +139,8 @@ if ps -p "${PID}" >/dev/null 2>&1; then
   info "后端服务已启动"
   info "PID: ${PID}"
   info "日志: ${LOG_FILE}"
+  info "监听地址: ${HOST}:${PORT}"
+  info "在线访问: http://${HOST}:${PORT}"
   exit 0
 else
   err "后端启动失败，进程已退出"

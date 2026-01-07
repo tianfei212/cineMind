@@ -20,11 +20,12 @@ const BASE_GAP = NODE_SIZE * 0.3; // Reduced gap from 0.6x to 0.3x diameter
 
 const calculateRadius = (count: number, scale: number) => {
   if (count <= 1) return 0;
+  // Standardize radius to prevent jumping: Enforce a minimum radius equivalent to ~8 items
   // Circumference = count * (diameter + gap)
-  // Radius = Circumference / 2PI
-  const circumference = count * (NODE_SIZE + BASE_GAP) * scale;
-  // Reduced min radius factor from 1.5x to 1.0x to allow closer packing for small counts
-  return Math.max(circumference / (2 * Math.PI), (NODE_SIZE * 1.0 * scale)); 
+  const minCount = 8; 
+  const effectiveCount = Math.max(count, minCount);
+  const circumference = effectiveCount * (NODE_SIZE + BASE_GAP) * scale;
+  return circumference / (2 * Math.PI);
 };
 
 // New Layout Calculation
@@ -407,49 +408,76 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
       // Logic for Deselecting: Suggest Current Level (Alternatives)
       logger.event('取消选择节点，重新获取本层级建议', { id: current.id, label: current.label, level: current.level });
 
-      // 1. Remove all nodes of current level and deeper levels
-      // Because we want to refresh the choices for the current level
-      setNodes(prev => {
-         const kept = prev.filter(n => n.level < current.level);
-         return applyLayout(kept, scale);
-      });
-
-      // 2. Build context excluding current node (up to parent)
-      const ctx: { type: string; label: string }[] = [];
-      for(let l=0; l < current.level; l++) {
-          const selected = nodes.find(n => n.level === l && n.isSelected);
-          if (selected) {
-              ctx.push({ type: levelLabels[l], label: selected.label });
-          }
-      }
-
-      const targetType = levelLabels[current.level];
-      
       try {
+        // 1. Clean up State & Remove Nodes
+        // Identify nodes to remove for cleanup
+        const nodesToRemove = nodes.filter(n => n.level >= current.level);
+        const idsToRemove = nodesToRemove.map(n => n.id);
+        
+        // Clean up auxiliary state
+        setAiKeywords(prev => {
+            const next = { ...prev };
+            idsToRemove.forEach(id => delete next[id]);
+            return next;
+        });
+        setAiPrompts(prev => {
+            const next = { ...prev };
+            idsToRemove.forEach(id => delete next[id]);
+            return next;
+        });
+        setKwByCat(prev => {
+            const next = { ...prev };
+            // Clear categories for current level and deeper
+            for (let l = current.level; l < levelLabels.length; l++) {
+                delete next[levelLabels[l]];
+            }
+            return next;
+        });
+
+        // Update nodes state
+        setNodes(prev => {
+           const kept = prev.filter(n => n.level < current.level);
+           return applyLayout(kept, scale);
+        });
+  
+        // 2. Build context excluding current node (up to parent)
+        const ctx: { type: string; label: string }[] = [];
+        for(let l=0; l < current.level; l++) {
+            const selected = nodes.find(n => n.level === l && n.isSelected);
+            if (selected) {
+                ctx.push({ type: levelLabels[l], label: selected.label });
+            }
+        }
+  
+        const targetType = levelLabels[current.level];
+        
         logger.info('重新获取关键词', { context: ctx, target: targetType });
         const res = await stepSuggest(ctx, targetType, 10);
         setKwByCat(prev => ({ ...prev, [targetType]: res.items }));
-
+  
         // 3. Spawn new nodes for the current level
         if (current.level === 0) {
            // Handle Root Level
            const rootX = window.innerWidth / 2;
            const rootY = window.innerHeight / 2;
-           const added: MindNode[] = res.items.map((label, i) => ({
-               id: `node-0-${Date.now()}-${i}`,
-               label,
-               x: rootX, y: rootY,
-               isSelected: false,
-               level: 0
-           }));
+           // Use calculateRadius for consistent layout
+           const count = res.items.length;
+           const radius = calculateRadius(count, scale);
+           
+           const added: MindNode[] = res.items.map((label, i) => {
+               const angle = (i / count) * Math.PI * 2;
+               return {
+                   id: `node-0-${Date.now()}-${i}`,
+                   label,
+                   x: rootX + Math.cos(angle) * radius,
+                   y: rootY + Math.sin(angle) * radius,
+                   isSelected: false,
+                   level: 0
+               };
+           });
            setNodes(prev => applyLayout([...prev, ...added], scale));
         } else {
            // Handle Child Level
-           // We need to find the parent node object to pass to spawnChildrenFromLabels
-           // Since we filtered nodes, the parent should still be in 'nodes' state (or we find it in 'prev' inside setNodes, but here we are outside)
-           // Actually 'nodes' state might not be updated immediately.
-           // But 'current.parentId' is stable.
-           // We can find the parent in the *current* nodes (before filter), it is safe because we only filtered levels >= current.level.
            const parent = nodes.find(n => n.id === current.parentId);
            if (parent) {
              // Do NOT use spawnChildrenFromLabels here because it relies on stale 'nodes' state for filtering
@@ -459,7 +487,8 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
              const baseAngle = Math.atan2(parent.y - window.innerHeight / 2, parent.x - window.innerWidth / 2);
              const spread = Math.PI * 1.4;
              const startAngle = baseAngle - spread / 2;
-             const radius = (NODE_SIZE * 1.8) * scale;
+             // Use consistent radius calculation logic
+             const radius = calculateRadius(Math.max(8, count), scale); // Use min 8 for consistency
              
              const added: MindNode[] = res.items.map((label, i) => {
                const angle = startAngle + (i / (count - 1 || 1)) * spread;
@@ -478,12 +507,14 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
              setConnections(prev => [...prev, ...added.map(s => ({ from: parent.id, to: s.id }))]);
            } else {
              logger.error('无法找到父节点，无法生成建议', { parentId: current.parentId });
+             // Fallback: Show error toast or visual feedback?
            }
         }
         
         logger.event('重新获取关键词完成', { context: ctx, target: targetType, items: res.items });
       } catch (e) {
         logger.error('重新获取关键词失败', e as any);
+        // Ensure state is at least consistent (nodes already removed)
       }
     }
   };
@@ -591,7 +622,7 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
                       className="bg-[#FFD700] text-black px-4 py-2 rounded-xl text-[0.6875rem] font-black flex justify-between items-center"
                     >
                       {selectedAtThisLevel.label}
-                      <button onClick={() => toggleSelect(selectedAtThisLevel)} className="opacity-40">×</button>
+                      {/* <button onClick={() => toggleSelect(selectedAtThisLevel)} className="opacity-40">×</button> */}
                     </motion.div>
                   ) : (
                     <div className="h-10 rounded-xl border border-white/5 flex items-center px-4">

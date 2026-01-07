@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Media
+backend/app/media/
+backend/cinemind.db
+*.bak
