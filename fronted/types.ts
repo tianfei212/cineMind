@@ -9,6 +9,7 @@ export interface GeneratedImage {
   fullUrl?: string;
   timestamp: number;
   prompt: string;
+  params?: any;
   config: {
     ratio: AspectRatio;
     resolution: Resolution;

@@ -17,9 +17,10 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
   const [galleryPage, setGalleryPage] = useState<GalleryPage | null>(null);
+  const [previewImage, setPreviewImage] = useState<GeneratedImage | null>(null);
 
   // Split screen state
-  const [leftWidth, setLeftWidth] = useState(40);
+  const [leftWidth, setLeftWidth] = useState(20);
   const [isDragging, setIsDragging] = useState(false);
 
   const ITEMS_PER_PAGE = 20;
@@ -37,12 +38,17 @@ const App: React.FC = () => {
           fullUrl: item.url, // Store full url
           timestamp: new Date(item.createTime).getTime(),
           prompt: item.prompt,
+          params: item.params,
           config: {
             ratio: "16:9", // Default or parsed from backend
             resolution: "1k" // Default or parsed from backend
           }
         }));
         setImages(mapped);
+        // Set first image as preview if available and no preview set
+        if (mapped.length > 0 && !previewImage) {
+           setPreviewImage(mapped[0]);
+        }
       }
     } catch (e) {
       logger.error('Failed to fetch gallery', e);
@@ -270,78 +276,123 @@ const App: React.FC = () => {
           )}
         </AnimatePresence>
 
-        <div className="flex-1 p-16 overflow-y-auto custom-scrollbar">
-          <div className="flex justify-between items-end mb-20">
-            <div className="space-y-4">
-              <h2 className="text-5xl font-extralight tracking-tighter">作品库</h2>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-[2px] bg-blue-600/20" />
-                <p className="text-black/20 text-[10px] uppercase tracking-[0.3em] font-bold">Chronological Composition Gallery</p>
-              </div>
-            </div>
-          </div>
-
-          {images.length === 0 ? (
-            <div className="h-[60vh] flex flex-col items-center justify-center opacity-[0.03]">
+        {images.length === 0 ? (
+           <div className="flex-1 flex flex-col items-center justify-center opacity-[0.03]">
               <svg className="w-48 h-48 mb-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={0.3} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
               <p className="text-xl tracking-[1em] uppercase font-black">库内暂无画面</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
-              <AnimatePresence mode="popLayout">
-                {paginatedImages.map((img) => (
-                  <motion.div
-                    key={img.id}
-                    layout
-                    initial={{ scale: 0.95, opacity: 0, y: 20 }}
-                    animate={{ scale: 1, opacity: 1, y: 0 }}
-                    onClick={() => setSelectedImage(img)}
-                    className="group relative rounded-[3.5rem] overflow-hidden bg-white shadow-[0_30px_80px_rgba(0,0,0,0.06)] transition-all border border-black/[0.03] hover:shadow-[0_40px_100px_rgba(0,113,227,0.1)] cursor-zoom-in"
-                  >
-                    <div className="relative aspect-video overflow-hidden">
-                      <img 
-                        src={img.url} 
-                        alt="Generated frame"
-                        className="w-full h-full object-cover transition-transform duration-[2000ms] group-hover:scale-110"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-700 p-12 flex flex-col justify-end">
-                        <div className="flex justify-between items-center border-t border-white/10 pt-8">
-                          <span className="text-[0.625rem] text-white/40 font-black uppercase tracking-widest">{new Date(img.timestamp).toLocaleTimeString()}</span>
-                          <span className="px-5 py-2 bg-white/10 backdrop-blur-md rounded-full text-[0.625rem] text-white font-black">{img.config.ratio}</span>
-                        </div>
+           </div>
+        ) : (
+           <>
+              {/* 上半部分：预览区 (60%) */}
+              <div className="h-[60%] p-16 flex flex-col relative border-b border-black/5">
+                 <div className="flex justify-between items-start mb-8 flex-shrink-0">
+                    <div className="space-y-4">
+                      <h2 className="text-5xl font-extralight tracking-tighter">作品库</h2>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-[2px] bg-blue-600/20" />
+                        <p className="text-black/20 text-[10px] uppercase tracking-[0.3em] font-bold">Chronological Composition Gallery</p>
                       </div>
                     </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          )}
+                 </div>
 
-          {/* 分页按钮 */}
-          {totalPages > 1 && (
-            <div className="mt-24 flex justify-center items-center gap-12 pb-20">
-              <button 
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(p => p - 1)}
-                className="p-6 bg-white shadow-xl rounded-full hover:bg-gray-50 disabled:opacity-30 transition-all border border-black/5"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" /></svg>
-              </button>
-              <div className="text-[11px] font-black text-black/20 uppercase tracking-[0.8em]">
-                P. {currentPage} <span className="text-black/5 mx-6">/</span> {totalPages}
+                 <div className="flex-1 relative rounded-[2rem] overflow-hidden bg-black shadow-2xl flex border border-white/5">
+                    {previewImage ? (
+                       <>
+                          {/* Left: Info Panel (40%) */}
+                          <div className="w-[40%] flex-shrink-0 h-full bg-[#0a0a0a] p-8 flex flex-col relative overflow-y-auto custom-scrollbar border-r border-white/5">
+                              {previewImage.params ? (
+                                <div className="grid grid-cols-2 gap-x-8 gap-y-8 content-start flex-1">
+                                  {[
+                                    "影片类型", "环境背景", "主角类型", "角色个体", 
+                                    "精彩瞬间", "关键元素", "镜头语言", "年代", "图像比例"
+                                  ].map(key => previewImage.params[key] ? (
+                                    <div key={key} className="flex flex-col gap-2">
+                                      <span className="text-sm font-bold text-white/40 uppercase tracking-[0.2em] whitespace-nowrap">{key}:</span>
+                                      <span className="text-[#FFD700] text-sm font-black tracking-wide leading-relaxed break-words">{previewImage.params[key]}</span>
+                                    </div>
+                                  ) : null)}
+                                </div>
+                              ) : (
+                                <div className="text-white/20 text-xs font-bold tracking-widest uppercase flex-1">No Info</div>
+                              )}
+                              
+                              <div className="mt-8 pt-8 border-t border-white/5 flex-shrink-0">
+                                <div className="flex flex-col gap-2 text-white">
+                                   <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">{previewImage.config.ratio}</span>
+                                   <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">{new Date(previewImage.timestamp).toLocaleTimeString()}</span>
+                                </div>
+                              </div>
+                          </div>
+
+                          {/* Right: Image */}
+                          <div 
+                              className="flex-1 h-full bg-black flex items-center justify-center relative cursor-zoom-in overflow-hidden"
+                              onClick={() => setSelectedImage(previewImage)}
+                          >
+                             <motion.img 
+                                key={previewImage.id}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.5 }}
+                                src={previewImage.fullUrl || previewImage.url} 
+                                alt="Preview" 
+                                className="w-full h-full object-cover"
+                             />
+                          </div>
+                       </>
+                    ) : (
+                       <div className="w-full h-full flex items-center justify-center text-white/20 text-sm tracking-widest uppercase font-bold">Select an image</div>
+                    )}
+                 </div>
               </div>
-              <button 
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(p => p + 1)}
-                className="p-6 bg-white shadow-xl rounded-full hover:bg-gray-50 disabled:opacity-30 transition-all border border-black/5"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" /></svg>
-              </button>
-            </div>
-          )}
-        </div>
+
+              {/* 下半部分：列表区 (40%) */}
+              <div className="h-[40%] bg-black/[0.02] p-8 overflow-y-auto custom-scrollbar">
+                 <div className="grid grid-cols-4 gap-6">
+                    <AnimatePresence mode="popLayout">
+                       {paginatedImages.map((img) => (
+                          <motion.div
+                             key={img.id}
+                             layout
+                             initial={{ scale: 0.9, opacity: 0 }}
+                             animate={{ scale: 1, opacity: 1 }}
+                             whileHover={{ scale: 1.05, y: -5 }}
+                             onClick={() => setPreviewImage(img)}
+                             className={`aspect-video rounded-xl overflow-hidden cursor-pointer shadow-sm transition-all border-2 ${previewImage?.id === img.id ? 'border-blue-500 shadow-blue-500/20' : 'border-transparent hover:border-black/10'}`}
+                          >
+                             <img src={img.url} alt="Thumbnail" className="w-full h-full object-cover" />
+                          </motion.div>
+                       ))}
+                    </AnimatePresence>
+                 </div>
+                 
+                 {/* 分页按钮 */}
+                 {totalPages > 1 && (
+                    <div className="mt-12 flex justify-center items-center gap-8 pb-8">
+                       <button 
+                          disabled={currentPage === 1}
+                          onClick={() => setCurrentPage(p => p - 1)}
+                          className="p-3 bg-white shadow-lg rounded-full hover:bg-gray-50 disabled:opacity-30 transition-all border border-black/5"
+                       >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" /></svg>
+                       </button>
+                       <div className="text-[10px] font-black text-black/20 uppercase tracking-[0.5em]">
+                          {currentPage} / {totalPages}
+                       </div>
+                       <button 
+                          disabled={currentPage === totalPages}
+                          onClick={() => setCurrentPage(p => p + 1)}
+                          className="p-3 bg-white shadow-lg rounded-full hover:bg-gray-50 disabled:opacity-30 transition-all border border-black/5"
+                       >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" /></svg>
+                       </button>
+                    </div>
+                 )}
+              </div>
+           </>
+        )}
       </main>
 
       {/* 灵感思维导图 */}
@@ -370,18 +421,25 @@ const App: React.FC = () => {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full h-full overflow-hidden flex items-center justify-center"
-              onClick={(e) => e.stopPropagation()}
+              className="relative w-full h-full overflow-hidden flex items-center justify-center cursor-zoom-out"
+              onClick={() => setSelectedImage(null)}
             >
               <img 
                 src={selectedImage.fullUrl || selectedImage.url} 
                 alt="Full screen" 
                 className="object-contain w-full h-full max-w-none max-h-none shadow-2xl" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedImage(null);
+                }}
               />
               
               <div className="absolute top-8 right-8 z-10">
                 <button 
-                  onClick={() => setSelectedImage(null)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedImage(null);
+                  }}
                   className="w-12 h-12 bg-white/10 hover:bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center text-white transition-all"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth={2}/></svg>

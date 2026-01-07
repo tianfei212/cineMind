@@ -217,6 +217,7 @@ export interface GalleryItem {
   createTime: string;
   dimensions: string;
   prompt: string;
+  params?: any;
 }
 
 export interface GalleryPage {

@@ -138,6 +138,7 @@ async def process_task(db: Session, task: Task, payload: Dict[str, str]) -> Grap
     gr = GraphResult()
     gr.related_nodes = json.dumps([])
     gr.params = json.dumps(params)
+    gr.user_selection = content_str  # Save user selection
     gr.prompt_zh = prompts.get("zh") or ""
     gr.prompt_en = prompts.get("en") or ""
     gr.storage_path = result["image_url"]

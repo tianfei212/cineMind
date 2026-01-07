@@ -46,14 +46,23 @@ def get_gallery_items(
         
         # Parse params to get dimensions if available
         dimensions = "Unknown"
+        params_dict = {}
         try:
-            p = json.loads(item.params)
-            if "width" in p and "height" in p:
-                dimensions = f"{p['width']}x{p['height']}"
-            elif "resolution" in p:
-                 dimensions = p["resolution"]
+            params_dict = json.loads(item.params)
+            if "width" in params_dict and "height" in params_dict:
+                dimensions = f"{params_dict['width']}x{params_dict['height']}"
+            elif "resolution" in params_dict:
+                 dimensions = params_dict["resolution"]
         except:
             pass
+
+        # Merge user_selection if available
+        if item.user_selection:
+            try:
+                selection_dict = json.loads(item.user_selection)
+                params_dict.update(selection_dict)
+            except:
+                pass
 
         thumb_url = item.thumbnail_path or item.storage_path
         full_url = item.storage_path
@@ -70,7 +79,8 @@ def get_gallery_items(
             "url": full_url,
             "createTime": item.generated_at.isoformat(),
             "dimensions": dimensions,
-            "prompt": item.prompt_zh
+            "prompt": item.prompt_zh,
+            "params": params_dict
         })
         
     return ok({

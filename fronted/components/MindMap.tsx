@@ -15,6 +15,80 @@ interface MindMapProps {
 }
 
 const DESIGN_WIDTH = 1920;
+const NODE_SIZE = 110; // Reduced from 192 to 110
+const BASE_GAP = NODE_SIZE * 0.3; // Reduced gap from 0.6x to 0.3x diameter
+
+const calculateRadius = (count: number, scale: number) => {
+  if (count <= 1) return 0;
+  // Circumference = count * (diameter + gap)
+  // Radius = Circumference / 2PI
+  const circumference = count * (NODE_SIZE + BASE_GAP) * scale;
+  // Reduced min radius factor from 1.5x to 1.0x to allow closer packing for small counts
+  return Math.max(circumference / (2 * Math.PI), (NODE_SIZE * 1.0 * scale)); 
+};
+
+// New Layout Calculation
+const applyLayout = (nodes: MindNode[], scale: number): MindNode[] => {
+  const selectedChain = nodes.filter(n => n.isSelected).sort((a, b) => a.level - b.level);
+  
+  // 1. Position Selected Nodes (Top Bar)
+  const topY = 120 * scale;
+  const centerX = window.innerWidth / 2;
+  const gap = (NODE_SIZE + 40) * scale;
+  
+  const updatedNodes = nodes.map(node => {
+    // Check if node is part of selected chain
+    const selectedIndex = selectedChain.findIndex(n => n.id === node.id);
+    
+    if (selectedIndex >= 0) {
+      // It is selected, move to top row
+      // Distribute horizontally: Center alignment
+      const totalWidth = (selectedChain.length - 1) * gap;
+      const startX = centerX - totalWidth / 2;
+      return {
+        ...node,
+        x: startX + selectedIndex * gap,
+        y: topY
+      };
+    }
+    return node;
+  });
+
+  // 2. Position Active Center Nodes
+  // Active nodes are children of the last selected node.
+  // If no node is selected, root nodes (level 0) are active.
+  const lastSelected = selectedChain.length > 0 ? selectedChain[selectedChain.length - 1] : null;
+  const activeParentId = lastSelected ? lastSelected.id : null;
+  const activeLevel = lastSelected ? lastSelected.level + 1 : 0;
+  
+  // Filter active nodes: children of activeParentId (or level 0 if no parent)
+  // Note: nodes with level 0 have no parentId usually, or we filter by parentId
+  const activeNodes = updatedNodes.filter(n => {
+    if (!activeParentId) return n.level === 0;
+    return n.parentId === activeParentId;
+  });
+
+  const activeCount = activeNodes.length;
+  const radius = calculateRadius(activeCount, scale);
+  const activeIds = activeNodes.map(n => n.id);
+
+  return updatedNodes.map(node => {
+    if (activeIds.includes(node.id)) {
+      const index = activeIds.indexOf(node.id);
+      const angle = (index / activeCount) * Math.PI * 2 - Math.PI / 2; // Start from top
+      return {
+        ...node,
+        x: centerX + Math.cos(angle) * radius,
+        y: window.innerHeight / 2 + Math.sin(angle) * radius
+      };
+    }
+    // For unselected siblings of previous levels, we don't update them explicitly here,
+    // they will be handled by visibility logic (opacity) or can stay where they were.
+    // Or we can move them to stash if we want to ensure they don't block clicks.
+    // For now, let's leave them (targetOpacity handles visibility).
+    return node;
+  });
+};
 
 const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, resolutionKey }) => {
   const [nodes, setNodes] = useState<MindNode[]>([]);
@@ -87,7 +161,7 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
       const initialNodes: MindNode[] = dataTree.children.map((child, i) => {
         const count = dataTree.children!.length;
         const angle = (i / count) * Math.PI * 2;
-        const radius = 280 * currentScale;
+        const radius = calculateRadius(count, currentScale);
         return {
           id: `node-0-${i}`,
           label: child.label,
@@ -97,7 +171,7 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
           level: 0
         };
       });
-      setNodes(initialNodes);
+      setNodes(applyLayout(initialNodes, currentScale));
     }
     
     return () => window.removeEventListener('resize', updateScale);
@@ -150,7 +224,8 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
     const baseAngle = Math.atan2(parent.y - window.innerHeight / 2, parent.x - window.innerWidth / 2);
     const spread = Math.PI * 1.4;
     const startAngle = baseAngle - spread / 2;
-    const radius = 240 * scale;
+    // Use smaller radius for dynamic suggestions, scaled by node size
+    const radius = (NODE_SIZE * 1.8) * scale;
     const added: MindNode[] = newLabels.map((label, i) => {
       const angle = startAngle + (i / (count - 1 || 1)) * spread;
       return {
@@ -163,7 +238,7 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
         level: nextLevel,
       };
     });
-    setNodes(prev => [...prev, ...added]);
+    setNodes(prev => applyLayout([...prev, ...added], scale));
     setConnections(prev => [...prev, ...added.map(s => ({ from: parent.id, to: s.id }))]);
   };
 
@@ -196,12 +271,15 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
     }
     setFocusedNodeId(node.id);
     logger.event('聚焦节点', { id: node.id, label: node.label });
-    setNodes(prev => prev.map(n => {
-      if (n.level === node.level) {
-        return { ...n, isSelected: n.id === node.id };
-      }
-      return n;
-    }));
+    setNodes(prev => {
+      const updated = prev.map(n => {
+        if (n.level === node.level) {
+          return { ...n, isSelected: n.id === node.id };
+        }
+        return n;
+      });
+      return applyLayout(updated, scale);
+    });
 
     const hasChildren = nodes.some(n => n.parentId === node.id);
     if (hasChildren) {
@@ -239,7 +317,8 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
           const spread = Math.PI * 1.2; // 展开角度
           const startAngle = baseAngle - spread / 2;
           const angle = startAngle + (i / (count - 1 || 1)) * spread;
-          const radius = 260 * scale;
+          // Use smaller radius for child nodes, scaled by node size
+          const radius = (NODE_SIZE * 1.8) * scale;
           
           return {
             id: `node-${nextLevel}-${Math.random().toString(36).substr(2, 5)}`,
@@ -252,7 +331,7 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
           };
         });
 
-        setNodes(prev => [...prev, ...subNodes]);
+        setNodes(prev => applyLayout([...prev, ...subNodes], scale));
         setConnections(prev => [...prev, ...subNodes.map(s => ({ from: node.id, to: s.id }))]);
       }
     }
@@ -279,32 +358,133 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
       logger.info('正在提交生图任务，忽略节点选择');
       return;
     }
-    setNodes(prev => prev.map(n => {
-      if (n.level === node.level) {
-        if (n.id === node.id) {
-          const nextSelected = !n.isSelected;
-          logger.event(nextSelected ? '选择节点' : '取消选择节点', { id: n.id, label: n.label, level: n.level });
-          return { ...n, isSelected: nextSelected };
+
+    // Get the latest state of the node
+    const current = nodes.find(n => n.id === node.id) || node;
+    const nextSelected = !current.isSelected;
+
+    setNodes(prev => {
+      let updated = prev.map(n => {
+        if (n.level === current.level) {
+          if (n.id === current.id) {
+            return { ...n, isSelected: nextSelected };
+          }
+          // If selecting, clear siblings. If deselecting, keep siblings as is (unselected).
+          return { ...n, isSelected: false }; 
         }
-        return { ...n, isSelected: false }; 
+        return n;
+      });
+
+      // If deselecting, clear selection for all deeper levels
+      if (!nextSelected) {
+        updated = updated.map(n => n.level > current.level ? { ...n, isSelected: false } : n);
       }
-      return n;
-    }));
-    const ctx = buildQueryContext(node);
-    const nextIdx = node.level + 1;
-    if (nextIdx >= levelLabels.length) {
-      logger.info('已到最后一层，停止递进查询(选择)');
-      return;
-    }
-    const nextType = levelLabels[nextIdx];
-    try {
-      const res = await stepSuggest(ctx, nextType, 10);
-      setAiKeywords(prev => ({ ...prev, [node.id]: res.items }));
-      setKwByCat(prev => ({ ...prev, [nextType]: res.items }));
-      spawnChildrenFromLabels(node, res.items);
-      logger.event('逐层建议(选择)', { context: ctx, target: res.target_type, items: res.items });
-    } catch (e) {
-      logger.error('逐层建议失败(选择)', e as any);
+
+      return applyLayout(updated, scale);
+    });
+
+    if (nextSelected) {
+      // Logic for Selecting: Suggest Next Level
+      logger.event('选择节点', { id: current.id, label: current.label, level: current.level });
+      
+      const ctx = buildQueryContext(current); // Context includes current node
+      const nextIdx = current.level + 1;
+      if (nextIdx >= levelLabels.length) {
+        logger.info('已到最后一层，停止递进查询(选择)');
+        return;
+      }
+      const nextType = levelLabels[nextIdx];
+      try {
+        const res = await stepSuggest(ctx, nextType, 10);
+        setAiKeywords(prev => ({ ...prev, [current.id]: res.items }));
+        setKwByCat(prev => ({ ...prev, [nextType]: res.items }));
+        spawnChildrenFromLabels(current, res.items);
+        logger.event('逐层建议(选择)', { context: ctx, target: res.target_type, items: res.items });
+      } catch (e) {
+        logger.error('逐层建议失败(选择)', e as any);
+      }
+    } else {
+      // Logic for Deselecting: Suggest Current Level (Alternatives)
+      logger.event('取消选择节点，重新获取本层级建议', { id: current.id, label: current.label, level: current.level });
+
+      // 1. Remove all nodes of current level and deeper levels
+      // Because we want to refresh the choices for the current level
+      setNodes(prev => {
+         const kept = prev.filter(n => n.level < current.level);
+         return applyLayout(kept, scale);
+      });
+
+      // 2. Build context excluding current node (up to parent)
+      const ctx: { type: string; label: string }[] = [];
+      for(let l=0; l < current.level; l++) {
+          const selected = nodes.find(n => n.level === l && n.isSelected);
+          if (selected) {
+              ctx.push({ type: levelLabels[l], label: selected.label });
+          }
+      }
+
+      const targetType = levelLabels[current.level];
+      
+      try {
+        logger.info('重新获取关键词', { context: ctx, target: targetType });
+        const res = await stepSuggest(ctx, targetType, 10);
+        setKwByCat(prev => ({ ...prev, [targetType]: res.items }));
+
+        // 3. Spawn new nodes for the current level
+        if (current.level === 0) {
+           // Handle Root Level
+           const rootX = window.innerWidth / 2;
+           const rootY = window.innerHeight / 2;
+           const added: MindNode[] = res.items.map((label, i) => ({
+               id: `node-0-${Date.now()}-${i}`,
+               label,
+               x: rootX, y: rootY,
+               isSelected: false,
+               level: 0
+           }));
+           setNodes(prev => applyLayout([...prev, ...added], scale));
+        } else {
+           // Handle Child Level
+           // We need to find the parent node object to pass to spawnChildrenFromLabels
+           // Since we filtered nodes, the parent should still be in 'nodes' state (or we find it in 'prev' inside setNodes, but here we are outside)
+           // Actually 'nodes' state might not be updated immediately.
+           // But 'current.parentId' is stable.
+           // We can find the parent in the *current* nodes (before filter), it is safe because we only filtered levels >= current.level.
+           const parent = nodes.find(n => n.id === current.parentId);
+           if (parent) {
+             // Do NOT use spawnChildrenFromLabels here because it relies on stale 'nodes' state for filtering
+             // Manually create nodes without filtering
+             const nextLevel = parent.level + 1;
+             const count = res.items.length;
+             const baseAngle = Math.atan2(parent.y - window.innerHeight / 2, parent.x - window.innerWidth / 2);
+             const spread = Math.PI * 1.4;
+             const startAngle = baseAngle - spread / 2;
+             const radius = (NODE_SIZE * 1.8) * scale;
+             
+             const added: MindNode[] = res.items.map((label, i) => {
+               const angle = startAngle + (i / (count - 1 || 1)) * spread;
+               return {
+                 id: `node-${nextLevel}-${Math.random().toString(36).substr(2, 5)}`,
+                 label,
+                 parentId: parent.id,
+                 x: parent.x + Math.cos(angle) * radius,
+                 y: parent.y + Math.sin(angle) * radius,
+                 isSelected: false,
+                 level: nextLevel,
+               };
+             });
+             
+             setNodes(prev => applyLayout([...prev, ...added], scale));
+             setConnections(prev => [...prev, ...added.map(s => ({ from: parent.id, to: s.id }))]);
+           } else {
+             logger.error('无法找到父节点，无法生成建议', { parentId: current.parentId });
+           }
+        }
+        
+        logger.event('重新获取关键词完成', { context: ctx, target: targetType, items: res.items });
+      } catch (e) {
+        logger.error('重新获取关键词失败', e as any);
+      }
     }
   };
 
@@ -576,29 +756,44 @@ const MindMap: React.FC<MindMapProps> = ({ onSelectionComplete, onClose, ratio, 
               className={`${!hasFocus || inFocus ? 'cursor-grab active:cursor-grabbing' : 'pointer-events-none'}`}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="relative flex flex-col items-center">
+              <motion.div 
+                className="relative flex flex-col items-center"
+                animate={{ 
+                  y: [0, -NODE_SIZE * 0.08, 0],
+                }}
+                transition={{ 
+                  repeat: Infinity, 
+                  duration: 3, 
+                  ease: "easeInOut",
+                  delay: Math.random() * 2 // Random start phase
+                }}
+              >
                 <button
                   onClick={() => handleNodeLeftClick(node)}
                   onContextMenu={(e) => { e.preventDefault(); toggleSelect(node); }}
                   className={`
-                    w-48 h-48 rounded-full flex flex-col items-center justify-center p-6 transition-all duration-300 text-center
+                    rounded-full flex flex-col items-center justify-center p-2 transition-all duration-300 text-center
                     ${node.isSelected 
                       ? 'bg-[#FFD700] text-black shadow-[0_0_80px_rgba(255,215,0,0.4)] border-transparent' 
                       : 'bg-white text-black/80 shadow-[0_30px_60px_rgba(0,0,0,0.06)] border border-gray-100 hover:border-blue-200 hover:scale-105'}
                   `}
+                  style={{
+                    width: NODE_SIZE * scale,
+                    height: NODE_SIZE * scale,
+                  }}
                 >
-                  <span className={`text-[1rem] font-black leading-tight mb-2 ${node.isSelected ? 'text-black' : 'text-gray-900'}`}>
+                  <span className={`font-black leading-tight mb-1 ${node.isSelected ? 'text-black' : 'text-gray-900'}`} style={{ fontSize: `${14 * scale}px` }}>
                     {node.label}
                   </span>
-                  <div className="h-px w-8 bg-current opacity-20 mb-2" />
-                  <span className="text-[0.5625rem] uppercase tracking-[0.25em] font-black opacity-40">
+                  <div className="h-px w-4 bg-current opacity-20 mb-1" />
+                  <span className="uppercase tracking-[0.25em] font-black opacity-40" style={{ fontSize: `${9 * scale}px` }}>
                     {levelLabels[node.level % levelLabels.length]}
                   </span>
                 </button>
                 {node.isSelected && (
-                  <div className="absolute inset-[-20px] rounded-full border-2 border-[#FFD700]/30 animate-ping pointer-events-none" />
+                  <div className="absolute inset-[-10px] rounded-full border-2 border-[#FFD700]/30 animate-ping pointer-events-none" />
                 )}
-              </div>
+              </motion.div>
             </motion.div>
           );
         })}

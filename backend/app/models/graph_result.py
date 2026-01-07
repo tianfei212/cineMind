@@ -10,6 +10,7 @@ class GraphResult(Base):
     graph_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     related_nodes: Mapped[str] = mapped_column(Text, nullable=False)
     params: Mapped[str] = mapped_column(Text, nullable=False)
+    user_selection: Mapped[str] = mapped_column(Text, nullable=True)
     prompt_zh: Mapped[str] = mapped_column(Text, nullable=True)
     prompt_en: Mapped[str] = mapped_column(Text, nullable=True)
     storage_path: Mapped[str] = mapped_column(Text, nullable=False)

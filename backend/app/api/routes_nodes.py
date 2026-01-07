@@ -204,11 +204,17 @@ async def step_suggest(payload: StepSuggestIn):
     film_labels = [i.label for i in items if i.type == "影片类型"]
     film_combo = "、".join(film_labels) if film_labels else "未指定"
     text = f"{context_lines}\n目标类别: {target}\n影片类型组合: {film_combo}"
-    if not user_tpl:
-        user_tpl = "请基于影片类型组合「{film_combo}」为目标类别「{target}」生成Top{top}条中文关键提示词。严格格式：仅输出纯中文关键词列表，每行恰好一个关键词；禁止任何编号、标点、符号或解释；总行数必须为{top}；每个关键词独立且具备检索价值。"
-    if target == "角色个体":
-        user_tpl = "请基于影片类型组合「{film_combo}」为目标类别「角色个体」生成Top{top}个具体角色中文名称（如老师、学生、怪兽等）。严格格式：仅输出纯中文角色名列表，每行恰好一个；禁止任何编号、标点、符号或解释；总行数必须为{top}；每个角色名独立且具备检索价值。"
-    tpl_filled = user_tpl.format(film_combo=film_combo, target=target, top=topn)
+    
+    final_tpl = None
+    if isinstance(user_tpl, dict):
+        final_tpl = user_tpl.get(target) or user_tpl.get("default")
+    elif isinstance(user_tpl, str):
+        final_tpl = user_tpl
+        
+    if not final_tpl:
+        final_tpl = "请基于影片类型组合「{film_combo}」为目标类别「{target}」生成Top{top}条中文关键提示词。严格格式：仅输出纯中文关键词列表，每行恰好一个关键词；禁止任何编号、标点、符号或解释；总行数必须为{top}；每个关键词独立且具备检索价值。"
+        
+    tpl_filled = final_tpl.format(film_combo=film_combo, target=target, top=topn)
     kw = await client.generate_keywords(text, topn, user_template=tpl_filled, role_override=role)
     try:
         log.info(f"[step-suggest:res] target={target} count={len(kw)}")
